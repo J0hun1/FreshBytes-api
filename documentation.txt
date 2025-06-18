@@ -10,6 +10,12 @@ to create new django app within directory:
         1. then add the "<name>" into the settings .py in <project-name> directory
         2. also add DRF with "rest_framework"
 
+migrations:
+    1. python manage.py makemigrations
+    2. python manage.py migrate
+
+to run/test python api:
+    python manage.py runserver
 
 notes:
     apps - ways to separate different logics (the api directory in this project's case)
@@ -19,3 +25,4 @@ notes:
     object relational mapping - maps a python object to a database instance
     generics - contains generic views used to update/delete etc. any model
     urls - defining a root or url to access the view
+    migrations - using the django ORM to automatically create correct sql tables in the database
