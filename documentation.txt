@@ -1,0 +1,21 @@
+Django setup:
+    django-admin startproject <project-name>
+
+    if in any case it fails try:
+        python -m django startproject <name>
+
+
+to create new django app within directory:
+    python manage.py startapp <name>
+        1. then add the "<name>" into the settings .py in <project-name> directory
+        2. also add DRF with "rest_framework"
+
+
+notes:
+    apps - ways to separate different logics (the api directory in this project's case)
+    models - where we define different db models (models.py)
+    serializers - takes models and converts it into json compatible data (serializers.py)
+    view - utilizes model and serializers
+    object relational mapping - maps a python object to a database instance
+    generics - contains generic views used to update/delete etc. any model
+    urls - defining a root or url to access the view
