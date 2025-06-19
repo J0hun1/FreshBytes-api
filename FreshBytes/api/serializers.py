@@ -3,6 +3,7 @@ from .models import Product
 from .models import Category
 from .models import User
 from .models import Seller
+from .models import SubCategory
 
 class ProductSerializer(serializers.ModelSerializer):
     class Meta:
@@ -12,7 +13,13 @@ class ProductSerializer(serializers.ModelSerializer):
 class CategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = Category
-        fields = ["category_id", "category_name", "category_isActive", "category_image", "created_at", "updated_at"]
+        fields = ["category_id","category_isActive", "category_image", "created_at", "updated_at"]
+
+class SubCategorySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SubCategory
+        fields = ["category_id", "sub_category_id", "sub_category_name", "sub_category_description", "sub_category_image", "created_at", "updated_at"]
+
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:

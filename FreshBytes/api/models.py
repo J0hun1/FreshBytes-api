@@ -72,6 +72,15 @@ class Category(models.Model):
     class Meta:
         db_table = 'Categories'
 
+class SubCategory(models.Model):
+    category_id = models.ForeignKey(Category, on_delete=models.CASCADE, null=True)
+    sub_category_id = models.AutoField(primary_key=True)
+    sub_category_name = models.CharField(max_length=255, default="", unique=True)
+    sub_category_description = models.CharField(max_length=255)
+    sub_category_image = models.ImageField(upload_to='sub_category_images/', blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
 
 class ProductStatus(models.TextChoices):
     ACTIVE = 'ACTIVE', 'Active'

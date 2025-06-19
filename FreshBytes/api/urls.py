@@ -1,7 +1,10 @@
 from django.urls import path
 from . import views
+from django.contrib import admin
 
 urlpatterns = [
+    path("admin/", admin.site.urls),
+
     #PRODUCTS 
         # list and create products
         path("products/", views.ProductPostListCreate.as_view(), name="products"),
@@ -14,6 +17,11 @@ urlpatterns = [
     #CATEGORIES 
         # list and create categories
         path("categories/", views.CategoryPostListCreate.as_view(), name="categories"),
+
+
+    #SUBCATEGORIES
+        # list and create subcategories
+        path("subcategories/", views.SubCategoryPostListCreate.as_view(), name="subcategories"),
 
     #USERS 
         # list and create users

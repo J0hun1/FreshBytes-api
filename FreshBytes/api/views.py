@@ -1,7 +1,8 @@
 from django.shortcuts import render
 from rest_framework import generics, status
-from .models import Product, Category, User, Seller
-from .serializers import ProductSerializer, CategorySerializer, UserSerializer, SellerSerializer
+from rest_framework.views import APIView
+from .models import Product, Category, User, Seller, SubCategory
+from .serializers import ProductSerializer, CategorySerializer, UserSerializer, SellerSerializer, SubCategorySerializer
 from rest_framework.response import Response
 # Create your views here.
 
@@ -17,6 +18,8 @@ class ProductPostListCreate(generics.ListCreateAPIView):
         #deletes all products
         Product.objects.all().delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+    
+
 #allows to access, update, and delete individual products
 class ProductPostRetrieveUpdateDestroy(generics.RetrieveUpdateDestroyAPIView):
     queryset = Product.objects.all()
@@ -36,6 +39,16 @@ class CategoryPostListCreate(generics.ListCreateAPIView):
         Category.objects.all().delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
     
+
+# SUBCATEGORIES
+class SubCategoryPostListCreate(generics.ListCreateAPIView):
+    queryset = SubCategory.objects.all()
+    serializer_class = SubCategorySerializer
+
+    def delete(self, request, *args, **kwargs):
+        #deletes all subcategories
+        SubCategory.objects.all().delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 #USERS
