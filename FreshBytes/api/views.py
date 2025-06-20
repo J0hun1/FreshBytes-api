@@ -1,10 +1,57 @@
 from django.shortcuts import render
 from rest_framework import generics, status
 from rest_framework.views import APIView
-from .models import Product, Category, User, Seller, SubCategory
-from .serializers import ProductSerializer, CategorySerializer, UserSerializer, SellerSerializer, SubCategorySerializer
+from .models import Product, Category, User, Seller, SubCategory, Reviews, Promo, Promo_Details
+from .serializers import ProductSerializer, CategorySerializer, UserSerializer, SellerSerializer, SubCategorySerializer, ReviewsSerializer, PromoSerializer, PromoDetailsSerializer
 from rest_framework.response import Response
 # Create your views here.
+
+# ALL DATA VIEW - Returns all data from all models
+class AllDataView(APIView):
+    def get(self, request):
+        """Get all data from all models in a single response"""
+        try:
+            # Get all data from each model
+            products = Product.objects.all()
+            categories = Category.objects.all()
+            users = User.objects.all()
+            sellers = Seller.objects.all()
+            subcategories = SubCategory.objects.all()
+            reviews = Reviews.objects.all()
+            
+            # Serialize the data
+            product_data = ProductSerializer(products, many=True).data
+            category_data = CategorySerializer(categories, many=True).data
+            user_data = UserSerializer(users, many=True).data
+            seller_data = SellerSerializer(sellers, many=True).data
+            subcategory_data = SubCategorySerializer(subcategories, many=True).data
+            review_data = ReviewsSerializer(reviews, many=True).data
+            
+            # Combine all data into a single response
+            all_data = {
+                'products': product_data,
+                'categories': category_data,
+                'users': user_data,
+                'sellers': seller_data,
+                'subcategories': subcategory_data,
+                'reviews': review_data,
+                'summary': {
+                    'total_products': products.count(),
+                    'total_categories': categories.count(),
+                    'total_users': users.count(),
+                    'total_sellers': sellers.count(),
+                    'total_subcategories': subcategories.count(),
+                    'total_reviews': reviews.count(),
+                }
+            }
+            
+            return Response(all_data, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            return Response(
+                {'error': f'An error occurred while fetching data: {str(e)}'}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 #PRODUCTS
 class ProductPostListCreate(generics.ListCreateAPIView):
@@ -50,6 +97,10 @@ class SubCategoryPostListCreate(generics.ListCreateAPIView):
         SubCategory.objects.all().delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
+class SubCategoryPostRetrieveUpdateDestroy(generics.RetrieveUpdateDestroyAPIView):
+    queryset = SubCategory.objects.all()
+    serializer_class = SubCategorySerializer
+    lookup_field = "pk"
 
 #USERS
 class UserPostListCreate(generics.ListCreateAPIView):
@@ -80,4 +131,51 @@ class SellerPostListCreate(generics.ListCreateAPIView):
 class SellerPostRetrieveUpdateDestroy(generics.RetrieveUpdateDestroyAPIView):
     queryset = Seller.objects.all()
     serializer_class = SellerSerializer
+    lookup_field = "pk"
+
+
+#REVIEWS
+class ReviewsPostListCreate(generics.ListCreateAPIView):
+    queryset = Reviews.objects.all()
+    serializer_class = ReviewsSerializer
+
+    def delete(self, request, *args, **kwargs):
+        #deletes all reviews
+        Reviews.objects.all().delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+class ReviewsPostRetrieveUpdateDestroy(generics.RetrieveUpdateDestroyAPIView):
+    queryset = Reviews.objects.all()
+    serializer_class = ReviewsSerializer
+    lookup_field = "pk"
+
+
+#PROMO
+class PromoPostListCreate(generics.ListCreateAPIView):
+    queryset = Promo.objects.all()
+    serializer_class = PromoSerializer
+
+    def delete(self, request, *args, **kwargs):
+        #deletes all promos
+        Promo.objects.all().delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+class PromoPostRetrieveUpdateDestroy(generics.RetrieveUpdateDestroyAPIView):
+    queryset = Promo.objects.all()
+    serializer_class = PromoSerializer
+    lookup_field = "pk"
+
+#PROMO DETAILS
+class PromoDetailsPostListCreate(generics.ListCreateAPIView):
+    queryset = Promo_Details.objects.all()
+    serializer_class = PromoDetailsSerializer
+
+    def delete(self, request, *args, **kwargs):
+        #deletes all promo details
+        Promo_Details.objects.all().delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+class PromoDetailsPostRetrieveUpdateDestroy(generics.RetrieveUpdateDestroyAPIView):
+    queryset = Promo_Details.objects.all()
+    serializer_class = PromoDetailsSerializer
     lookup_field = "pk"
