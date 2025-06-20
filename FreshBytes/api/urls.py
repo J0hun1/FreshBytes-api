@@ -11,9 +11,6 @@ urlpatterns = [
         # access, update, and delete individual products
         path("products/<str:pk>/", views.ProductPostRetrieveUpdateDestroy.as_view(), name="update-delete-product"),
 
-        # list and create categories
-        path("categories/", views.CategoryPostListCreate.as_view(), name="categories"),
-
     #CATEGORIES 
         # list and create categories
         path("categories/", views.CategoryPostListCreate.as_view(), name="categories"),
