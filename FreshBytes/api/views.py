@@ -211,6 +211,12 @@ class PromoAddProducts(APIView):
 class PromoRemoveProducts(APIView):
     """Remove products from a specific promo"""
     def post(self, request, promo_id):
+        return self._remove_products(request, promo_id)
+    
+    def delete(self, request, promo_id):
+        return self._remove_products(request, promo_id)
+    
+    def _remove_products(self, request, promo_id):
         try:
             promo = Promo.objects.get(promo_id=promo_id)
             product_ids = request.data.get('product_ids', [])
@@ -278,6 +284,12 @@ class PromoGetProducts(APIView):
 class PromoClearProducts(APIView):
     """Remove all products from a specific promo"""
     def post(self, request, promo_id):
+        return self._clear_products(request, promo_id)
+    
+    def delete(self, request, promo_id):
+        return self._clear_products(request, promo_id)
+    
+    def _clear_products(self, request, promo_id):
         try:
             promo = Promo.objects.get(promo_id=promo_id)
             
