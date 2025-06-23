@@ -6,11 +6,10 @@ from .models import Seller
 from .models import SubCategory
 from .models import Reviews
 from .models import Promo
-from .models import Promo_Details
 class ProductSerializer(serializers.ModelSerializer):
     class Meta:
         model = Product
-        fields = ["product_id", "user_id", "seller_id", "product_name", "product_price", "product_brief_description", "product_full_description", "product_discountedPrice", "product_sku", "product_status", "product_location", "category_id", "sub_category_id", "quantity", "post_date", "harvest_date", "is_active", "review_count", "top_rated", "discounted_amount", "is_discounted", "is_srp", "is_deleted", "sell_count", "offer_start_date", "offer_end_date", "created_at", "updated_at"]
+        fields = ["product_id", "user_id", "seller_id", "product_name", "product_price", "product_brief_description", "product_full_description", "product_discountedPrice", "product_sku", "product_status", "product_location", "category_id", "sub_category_id", "quantity", "post_date", "harvest_date", "is_active", "review_count", "top_rated", "discounted_amount", "is_discounted", "is_srp", "is_deleted", "sell_count", "offer_start_date", "offer_end_date", "created_at", "updated_at", "has_promo"]
 
 class CategorySerializer(serializers.ModelSerializer):
     class Meta:
@@ -41,10 +40,5 @@ class ReviewsSerializer(serializers.ModelSerializer):
 class PromoSerializer(serializers.ModelSerializer):
     class Meta:
         model = Promo
-        fields = ["promo_id", "seller_id", "promo_name", "promo_description", "discount_type", "discount_amount", "discount_percentage", "promo_start_date", "promo_end_date", "is_active", "created_at", "updated_at"]
+        fields = ["promo_id", "seller_id", "product_id", "promo_name", "promo_description", "discount_type", "discount_amount", "discount_percentage", "promo_start_date", "promo_end_date", "is_active", "created_at", "updated_at"]
 
-class PromoDetailsSerializer(serializers.ModelSerializer):
-    product_ids = serializers.PrimaryKeyRelatedField(many=True, queryset=Product.objects.all())
-    class Meta:
-        model = Promo_Details
-        fields = ["promo_details_id", "promo_id", "product_ids", "created_at", "updated_at"]

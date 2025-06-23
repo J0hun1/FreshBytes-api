@@ -48,11 +48,12 @@ urlpatterns = [
         path("promos/", views.PromoPostListCreate.as_view(), name="promos"),
         # access, update, and delete individual promos
         path("promos/<str:pk>/", views.PromoPostRetrieveUpdateDestroy.as_view(), name="update-delete-promo"),
+        # manage products in promos
+        path("promos/<str:promo_id>/add-products/", views.PromoAddProducts.as_view(), name="promo-add-products"),
+        path("promos/<str:promo_id>/remove-products/", views.PromoRemoveProducts.as_view(), name="promo-remove-products"),
+        path("promos/<str:promo_id>/products/", views.PromoGetProducts.as_view(), name="promo-get-products"),
+        path("promos/<str:promo_id>/clear-products/", views.PromoClearProducts.as_view(), name="promo-clear-products"),
 
 
     #PROMO DETAILS
-        # list and create promo details
-        path("promo-details/", views.PromoDetailsPostListCreate.as_view(), name="promo-details"),
-        # access, update, and delete individual promo details
-        path("promo-details/<str:pk>/", views.PromoDetailsPostRetrieveUpdateDestroy.as_view(), name="update-delete-promo-details"),
 ]

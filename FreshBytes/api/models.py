@@ -1,6 +1,8 @@
 from django.db import models
 from django.contrib.postgres.fields import ArrayField
 from django.utils import timezone
+from django.db.models.signals import post_save, post_delete
+from django.dispatch import receiver
 
 
 class User(models.Model):
@@ -46,7 +48,7 @@ class Seller(models.Model):
         super().save(*args, **kwargs)
     user_id = models.ForeignKey(User, on_delete=models.CASCADE, null=True)
     business_name = models.CharField(default="", max_length=255)
-    business_email = models.EmailField(default="", unique=True)
+    business_email = models.EmailField(default="")
     business_phone = models.IntegerField(default="")
     business_address = models.CharField(default="", max_length=255, null=True)
     total_earnings = models.DecimalField(max_digits=10, decimal_places=2, default=0, null=True)
@@ -142,6 +144,7 @@ class Product(models.Model):
     product_location = models.CharField(max_length=255, null=True)
     category_id = models.ForeignKey(Category, on_delete=models.CASCADE, null=True)
     sub_category_id = models.ForeignKey(SubCategory, on_delete=models.CASCADE, null=True)
+    has_promo = models.BooleanField(default=False)
     weight = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     quantity = models.IntegerField(default=1)
     post_date = models.DateTimeField(default=timezone.now)
@@ -202,6 +205,7 @@ class Discount_Type(models.TextChoices):
 class Promo(models.Model):
     promo_id = models.CharField(primary_key=True, max_length=12, unique=True, editable=False)
     seller_id = models.ForeignKey(Seller, on_delete=models.CASCADE, null=True)
+    product_id = models.ManyToManyField(Product, related_name='promos')
 
     def save(self, *args, **kwargs):
         if not self.promo_id:
@@ -224,41 +228,64 @@ class Promo(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
-
     class Meta:
         db_table = 'Promo'
 
-class Promo_Details(models.Model):
-    promo_details_id = models.CharField(primary_key=True, max_length=12, unique=True, editable=False)
-    promo_id = models.ForeignKey(Promo, on_delete=models.CASCADE, null=True)
-
-    def save(self, *args, **kwargs):
-        if not self.promo_details_id:
-            last_promo_details = Promo_Details.objects.order_by('-created_at').first()
-            if last_promo_details:
-                last_id = int(last_promo_details.promo_details_id[3:6])  # Extract the numeric part after 'ptid'
-                new_id = f"ptid{last_id + 1:03d}25"
-            else:
-                new_id = "ptid00125"
-            self.promo_details_id = new_id
-        super().save(*args, **kwargs)
+# Signals to automatically update has_promo field on products
+@receiver(post_save, sender=Promo)
+def update_product_has_promo_on_save(sender, instance, created, **kwargs):
+    """Update has_promo field when a promo is created or updated"""
+    # Get all products associated with this promo
+    products = instance.product_id.all()
     
+    for product in products:
+        # Check if there are any active promos for this product
+        active_promos = Promo.objects.filter(
+            product_id=product,
+            is_active=True
+        ).exists()
+        
+        # Update the product's has_promo field
+        product.has_promo = active_promos
+        product.save(update_fields=['has_promo'])
 
-    def save(self, *args, **kwargs):
-        if not self.promo_code:
-            last_promo_details = Promo_Details.objects.order_by('-created_at').first()
-            if last_promo_details:
-                last_code = int(last_promo_details.promo_code[-3:])  # Extract the numeric part at the end
-                new_code = f"PC{last_code + 1:03d}"
-            else:
-                new_code = "PC001"
-            self.promo_code = new_code
-        super().save(*args, **kwargs)
+@receiver(post_delete, sender=Promo)
+def update_product_has_promo_on_delete(sender, instance, **kwargs):
+    """Update has_promo field when a promo is deleted"""
+    # Get all products that were associated with this promo
+    products = instance.product_id.all()
     
-    product_id = models.ForeignKey(Product, on_delete=models.CASCADE, null=True)
-    is_active = models.BooleanField(default=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    for product in products:
+        # Check if there are any remaining active promos for this product
+        active_promos = Promo.objects.filter(
+            product_id=product,
+            is_active=True
+        ).exists()
+        
+        # Update the product's has_promo field
+        product.has_promo = active_promos
+        product.save(update_fields=['has_promo'])
 
-    class Meta:
-        db_table = 'Promo_Details'
+# Signal to handle many-to-many relationship changes
+@receiver(models.signals.m2m_changed, sender=Promo.product_id.through)
+def update_product_has_promo_on_m2m_change(sender, instance, action, pk_set, **kwargs):
+    """Update has_promo field when products are added/removed from a promo"""
+    if action in ["post_add", "post_remove", "post_clear"]:
+        # Get all affected products
+        if action == "post_clear":
+            # All products were removed, so we need to update all products that were in this promo
+            products = instance.product_id.all()
+        else:
+            # Get the specific products that were added/removed
+            products = Product.objects.filter(pk__in=pk_set)
+        
+        for product in products:
+            # Check if there are any active promos for this product
+            active_promos = Promo.objects.filter(
+                product_id=product,
+                is_active=True
+            ).exists()
+            
+            # Update the product's has_promo field
+            product.has_promo = active_promos
+            product.save(update_fields=['has_promo'])
