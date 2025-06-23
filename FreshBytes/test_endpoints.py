@@ -59,22 +59,14 @@ def test_endpoints():
             response = requests.get(f"{BASE_URL}/promos/{promo_id}/products/")
             print(f"✅ Get products endpoint: {response.status_code}")
             
-            # Test removing products (POST method)
+            # Test removing products
             remove_data = {"product_ids": ["prod00125"]}
             response = requests.post(f"{BASE_URL}/promos/{promo_id}/remove-products/", json=remove_data)
-            print(f"✅ Remove products endpoint (POST): {response.status_code}")
+            print(f"✅ Remove products endpoint: {response.status_code}")
             
-            # Test removing products (DELETE method)
-            response = requests.delete(f"{BASE_URL}/promos/{promo_id}/remove-products/", json=remove_data)
-            print(f"✅ Remove products endpoint (DELETE): {response.status_code}")
-            
-            # Test clearing products (POST method)
+            # Test clearing products
             response = requests.post(f"{BASE_URL}/promos/{promo_id}/clear-products/")
-            print(f"✅ Clear products endpoint (POST): {response.status_code}")
-            
-            # Test clearing products (DELETE method)
-            response = requests.delete(f"{BASE_URL}/promos/{promo_id}/clear-products/")
-            print(f"✅ Clear products endpoint (DELETE): {response.status_code}")
+            print(f"✅ Clear products endpoint: {response.status_code}")
             
         else:
             print(f"❌ Failed to create promo: {response.status_code}")

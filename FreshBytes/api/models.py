@@ -3,8 +3,9 @@ from django.contrib.postgres.fields import ArrayField
 from django.utils import timezone
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
+from .services import update_seller_total_products
 
-
+#USER
 class User(models.Model):
     user_id = models.CharField(primary_key=True, max_length=5, unique=True, editable=False)
 
@@ -32,7 +33,7 @@ class User(models.Model):
     is_deleted = models.BooleanField(default=False)
     is_admin = models.BooleanField(default=False)
     
-
+#SELLER
 class Seller(models.Model):
     seller_id = models.CharField(primary_key=True, max_length=8, unique=True, editable=False)
 
@@ -63,6 +64,8 @@ class Seller(models.Model):
     is_active = models.BooleanField(default=True)
     is_deleted = models.BooleanField(default=False)
 
+
+#CATEGORY
 class Category(models.Model):
     category_id = models.AutoField(primary_key=True)
     category_name = models.CharField(max_length=255, unique=True)
@@ -75,6 +78,7 @@ class Category(models.Model):
     class Meta:
         db_table = 'Categories'
 
+#SUBCATEGORY
 class SubCategory(models.Model):
     sub_category_id = models.CharField(primary_key=True, max_length=10, unique=True, editable=False)
 
@@ -96,12 +100,12 @@ class SubCategory(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     
 
+#PRODUCT 
 class ProductStatus(models.TextChoices):
-    ACTIVE = 'ACTIVE', 'Active'
-    INACTIVE = 'INACTIVE', 'Inactive'
-    OUT_OF_STOCK = 'OUT_OF_STOCK', 'Out of Stock'
-    DISCONTINUED = 'DISCONTINUED', 'Discontinued'
-
+    ROTTEN = 'ROTTEN', 'Rotten'
+    SLIGHTLY_WILTED = 'SLIGHTLY_WILTED', 'Slightly Wilted'
+    FRESH = 'FRESH', 'Fresh'
+    
 class Product(models.Model):
     product_id = models.CharField(primary_key=True, max_length=8, unique=True, editable=False)
 
@@ -140,7 +144,7 @@ class Product(models.Model):
     product_full_description = models.CharField(max_length=255)
     product_discountedPrice = models.DecimalField(max_digits=10, decimal_places=2, null=True)
     product_sku = models.CharField(max_length=255)
-    product_status = models.CharField(max_length=20, choices=ProductStatus.choices, default=ProductStatus.ACTIVE)
+    product_status = models.CharField(max_length=20, choices=ProductStatus.choices, default=ProductStatus.FRESH)
     product_location = models.CharField(max_length=255, null=True)
     category_id = models.ForeignKey(Category, on_delete=models.CASCADE, null=True)
     sub_category_id = models.ForeignKey(SubCategory, on_delete=models.CASCADE, null=True)
@@ -173,6 +177,21 @@ class Product(models.Model):
     class Meta:
         db_table = 'Products'
 
+@receiver(post_save, sender=Product)
+def update_seller_product_count_on_save(sender, instance, **kwargs):
+    """Update the seller's product count when a product is saved."""
+    if instance.seller_id:
+        update_seller_total_products(instance.seller_id)
+
+
+@receiver(post_delete, sender=Product)
+def update_seller_product_count_on_delete(sender, instance, **kwargs):
+    """Update the seller's product count when a product is deleted."""
+    if instance.seller_id:
+        update_seller_total_products(instance.seller_id)
+            
+
+#REVIEWS
 class Reviews(models.Model):
     review_id = models.CharField(primary_key=True, max_length=12, unique=True, editable=False)
 
@@ -198,13 +217,15 @@ class Reviews(models.Model):
     class Meta:
         db_table = 'Reviews'
 
+
+#PROMO
 class Discount_Type(models.TextChoices):
     PERCENTAGE = 'PERCENTAGE', 'Percentage'
     FIXED = 'FIXED', 'Fixed'
 
 class Promo(models.Model):
     promo_id = models.CharField(primary_key=True, max_length=12, unique=True, editable=False)
-    seller_id = models.ForeignKey(Seller, on_delete=models.CASCADE, null=True)
+    seller_id = models.ForeignKey(Seller, on_delete=models.CASCADE, default=None)
     product_id = models.ManyToManyField(Product, related_name='promos')
 
     def save(self, *args, **kwargs):
@@ -289,3 +310,5 @@ def update_product_has_promo_on_m2m_change(sender, instance, action, pk_set, **k
             # Update the product's has_promo field
             product.has_promo = active_promos
             product.save(update_fields=['has_promo'])
+
+

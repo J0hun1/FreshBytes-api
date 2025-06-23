@@ -64,9 +64,9 @@ Add multiple products to a specific promo.
 ---
 
 ### 3. Remove Products from a Promo
-**POST** or **DELETE** `/promos/{promo_id}/remove-products/`
+**POST** `/promos/{promo_id}/remove-products/`
 
-Remove specific products from a promo. Both POST and DELETE methods are supported.
+Remove specific products from a promo.
 
 **Request Body:**
 ```json
@@ -115,9 +115,9 @@ Get all products currently in a specific promo.
 ---
 
 ### 5. Clear All Products from a Promo
-**POST** or **DELETE** `/promos/{promo_id}/clear-products/`
+**POST** `/promos/{promo_id}/clear-products/`
 
-Remove all products from a promo at once. Both POST and DELETE methods are supported.
+Remove all products from a promo at once.
 
 **Response:**
 ```json
@@ -172,70 +172,6 @@ const addProductsToPromo = async (promoId, productIds) => {
     console.log(result.message);
   } catch (error) {
     console.error('Error adding products:', error);
-  }
-};
-
-// Remove products from a promo (using POST)
-const removeProductsFromPromo = async (promoId, productIds) => {
-  try {
-    const response = await fetch(`/promos/${promoId}/remove-products/`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ product_ids: productIds })
-    });
-    
-    const result = await response.json();
-    console.log(result.message);
-  } catch (error) {
-    console.error('Error removing products:', error);
-  }
-};
-
-// Remove products from a promo (using DELETE - more RESTful)
-const removeProductsFromPromoDelete = async (promoId, productIds) => {
-  try {
-    const response = await fetch(`/promos/${promoId}/remove-products/`, {
-      method: 'DELETE',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ product_ids: productIds })
-    });
-    
-    const result = await response.json();
-    console.log(result.message);
-  } catch (error) {
-    console.error('Error removing products:', error);
-  }
-};
-
-// Clear all products from a promo (using POST)
-const clearPromoProducts = async (promoId) => {
-  try {
-    const response = await fetch(`/promos/${promoId}/clear-products/`, {
-      method: 'POST'
-    });
-    
-    const result = await response.json();
-    console.log(result.message);
-  } catch (error) {
-    console.error('Error clearing products:', error);
-  }
-};
-
-// Clear all products from a promo (using DELETE - more RESTful)
-const clearPromoProductsDelete = async (promoId) => {
-  try {
-    const response = await fetch(`/promos/${promoId}/clear-products/`, {
-      method: 'DELETE'
-    });
-    
-    const result = await response.json();
-    console.log(result.message);
-  } catch (error) {
-    console.error('Error clearing products:', error);
   }
 };
 

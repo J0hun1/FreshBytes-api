@@ -6,6 +6,7 @@ from .models import Seller
 from .models import SubCategory
 from .models import Reviews
 from .models import Promo
+
 class ProductSerializer(serializers.ModelSerializer):
     class Meta:
         model = Product
@@ -41,4 +42,3 @@ class PromoSerializer(serializers.ModelSerializer):
     class Meta:
         model = Promo
         fields = ["promo_id", "seller_id", "product_id", "promo_name", "promo_description", "discount_type", "discount_amount", "discount_percentage", "promo_start_date", "promo_end_date", "is_active", "created_at", "updated_at"]
-
