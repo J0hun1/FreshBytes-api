@@ -3,7 +3,7 @@ from django.contrib.postgres.fields import ArrayField
 from django.utils import timezone
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
-from .services import update_seller_total_products
+from .services import update_seller_total_products, update_products_has_promo_on_promo_save, update_products_has_promo_on_promo_delete, update_products_has_promo_on_m2m_change, update_cart_total_price
 
 #USER
 class User(models.Model):
@@ -103,7 +103,7 @@ class SubCategory(models.Model):
 #PRODUCT 
 class ProductStatus(models.TextChoices):
     ROTTEN = 'ROTTEN', 'Rotten'
-    SLIGHTLY_WILTED = 'SLIGHTLY_WILTED', 'Slightly Wilted'
+    SLIGHTLY_WITHERED = 'SLIGHTLY_WITHERED', 'Slightly Withered'
     FRESH = 'FRESH', 'Fresh'
     
 class Product(models.Model):
@@ -251,64 +251,102 @@ class Promo(models.Model):
 
     class Meta:
         db_table = 'Promo'
+        
 
 # Signals to automatically update has_promo field on products
 @receiver(post_save, sender=Promo)
 def update_product_has_promo_on_save(sender, instance, created, **kwargs):
     """Update has_promo field when a promo is created or updated"""
-    # Get all products associated with this promo
-    products = instance.product_id.all()
-    
-    for product in products:
-        # Check if there are any active promos for this product
-        active_promos = Promo.objects.filter(
-            product_id=product,
-            is_active=True
-        ).exists()
-        
-        # Update the product's has_promo field
-        product.has_promo = active_promos
-        product.save(update_fields=['has_promo'])
+    update_products_has_promo_on_promo_save(instance)
 
 @receiver(post_delete, sender=Promo)
 def update_product_has_promo_on_delete(sender, instance, **kwargs):
     """Update has_promo field when a promo is deleted"""
-    # Get all products that were associated with this promo
-    products = instance.product_id.all()
-    
-    for product in products:
-        # Check if there are any remaining active promos for this product
-        active_promos = Promo.objects.filter(
-            product_id=product,
-            is_active=True
-        ).exists()
-        
-        # Update the product's has_promo field
-        product.has_promo = active_promos
-        product.save(update_fields=['has_promo'])
+    update_products_has_promo_on_promo_delete(instance)
 
 # Signal to handle many-to-many relationship changes
 @receiver(models.signals.m2m_changed, sender=Promo.product_id.through)
 def update_product_has_promo_on_m2m_change(sender, instance, action, pk_set, **kwargs):
     """Update has_promo field when products are added/removed from a promo"""
     if action in ["post_add", "post_remove", "post_clear"]:
-        # Get all affected products
-        if action == "post_clear":
-            # All products were removed, so we need to update all products that were in this promo
-            products = instance.product_id.all()
-        else:
-            # Get the specific products that were added/removed
-            products = Product.objects.filter(pk__in=pk_set)
+        update_products_has_promo_on_m2m_change(instance, action, pk_set)
+
+
+#CART
+class Cart(models.Model):
+    cart_id = models.CharField(primary_key=True, max_length=12, unique=True, editable=False)
+
+    def save(self, *args, **kwargs):
+        if not self.cart_id:
+            last_cart = Cart.objects.order_by('-created_at').first()
+            if last_cart:
+                last_id = int(last_cart.cart_id[3:6])  # Extract the numeric part after 'cid'
+                new_id = f"cid{last_id + 1:03d}25"
+            else:
+                new_id = "cid00125"
+            self.cart_id = new_id
+        super().save(*args, **kwargs)
         
-        for product in products:
-            # Check if there are any active promos for this product
-            active_promos = Promo.objects.filter(
-                product_id=product,
-                is_active=True
-            ).exists()
-            
-            # Update the product's has_promo field
-            product.has_promo = active_promos
-            product.save(update_fields=['has_promo'])
+    user_id = models.OneToOneField(User, on_delete=models.CASCADE, null=True)
+    total_price = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+#CART ITEMS
+class CartItem(models.Model):
+    cart_item_id = models.CharField(primary_key=True, max_length=12, unique=True, editable=False)
+    cart_id = models.ForeignKey(Cart, on_delete=models.CASCADE, null=True)
+    product_id = models.ForeignKey(Product, on_delete=models.CASCADE, null=True)
+    quantity = models.IntegerField(default=1)
+    total_price = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    discount_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    discount_percentage = models.IntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def save(self, *args, **kwargs):
+        if not self.cart_item_id:
+            last_cart_item = CartItem.objects.order_by('-created_at').first()
+            if last_cart_item and last_cart_item.cart_item_id and len(last_cart_item.cart_item_id) >= 8:
+                try:
+                    last_id = int(last_cart_item.cart_item_id[5:8])  # Extract the numeric part after 'citid'
+                    new_id = f"citid{last_id + 1:03d}25"
+                except (ValueError, IndexError):
+                    new_id = "citid00125"
+            else:
+                new_id = "citid00125"
+            self.cart_item_id = new_id
+        
+        # Calculate total_price before saving
+        if self.product_id:
+            product_price = self.product_id.product_discountedPrice if self.product_id.is_discounted else self.product_id.product_price
+            self.total_price = product_price * self.quantity
+        
+        super().save(*args, **kwargs)
+
+@receiver(post_save, sender=CartItem)
+def update_cart_total_price_on_save(sender, instance, **kwargs):
+    """Update the cart's total price when a cart item is saved."""
+    if instance.cart_id:
+        update_cart_total_price(instance.cart_id)
+
+@receiver(post_delete, sender=CartItem)
+def update_cart_total_price_on_delete(sender, instance, **kwargs):
+    """Update the cart's total price when a cart item is deleted."""
+    if instance.cart_id:
+        update_cart_total_price(instance.cart_id)
 
 
+#ORDER
+
+
+
+#ORDER ITEMS
+
+
+
+#ORDER STATUS
+
+
+
+#PAYMENT
