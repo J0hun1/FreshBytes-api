@@ -2,8 +2,9 @@ from django.shortcuts import render
 from rest_framework import generics, status
 from rest_framework.views import APIView
 from .models import Product, Category, User, Seller, SubCategory, Reviews, Promo, Cart, CartItem
-from .serializers import ProductSerializer, CategorySerializer, UserSerializer, SellerSerializer, SubCategorySerializer, ReviewsSerializer, PromoSerializer, CartSerializer, CartItemSerializer
+from .serializers import ProductSerializer, CategorySerializer, UserSerializer, SellerSerializer, SubCategorySerializer, ReviewsSerializer, PromoSerializer
 from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
 
 # Create your views here.
 
@@ -171,31 +172,3 @@ class PromoPostRetrieveUpdateDestroy(generics.RetrieveUpdateDestroyAPIView):
 
 
 #CART
-class CartPostListCreate(generics.ListCreateAPIView):
-    queryset = Cart.objects.all()
-    serializer_class = CartSerializer
-
-    def delete(self, request, *args, **kwargs):
-        #deletes all carts
-        Cart.objects.all().delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
-
-class CartPostRetrieveUpdateDestroy(generics.RetrieveUpdateDestroyAPIView):
-    queryset = Cart.objects.all()
-    serializer_class = CartSerializer
-    lookup_field = "pk"
-
-#CART ITEMS
-class CartItemPostListCreate(generics.ListCreateAPIView):
-    queryset = CartItem.objects.all()
-    serializer_class = CartItemSerializer
-
-    def delete(self, request, *args, **kwargs):
-        #deletes all cart items
-        CartItem.objects.all().delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
-
-class CartItemPostRetrieveUpdateDestroy(generics.RetrieveUpdateDestroyAPIView):
-    queryset = CartItem.objects.all()
-    serializer_class = CartItemSerializer
-    lookup_field = "pk"

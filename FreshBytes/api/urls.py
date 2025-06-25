@@ -53,14 +53,5 @@ urlpatterns = [
         path("promos/<str:pk>/", views.PromoPostRetrieveUpdateDestroy.as_view(), name="update-delete-promo"),
 
     #CART
-        # list and create carts
-        path("carts/", views.CartPostListCreate.as_view(), name="carts"),
-        # access, update, and delete individual carts
-        path("carts/<str:pk>/", views.CartPostRetrieveUpdateDestroy.as_view(), name="update-delete-cart"),
-
-    #CART ITEMS
-        # list and create cart items
-        path("cart-items/", views.CartItemPostListCreate.as_view(), name="cart-items"),
-        # access, update, and delete individual cart items
-        path("cart-items/<str:pk>/", views.CartItemPostRetrieveUpdateDestroy.as_view(), name="update-delete-cart-item"),
+        
 ]

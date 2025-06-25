@@ -3,7 +3,7 @@ from django.contrib.postgres.fields import ArrayField
 from django.utils import timezone
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
-from .services import update_seller_total_products, update_products_has_promo_on_promo_save, update_products_has_promo_on_promo_delete, update_products_has_promo_on_m2m_change, update_cart_total_price, calculate_cart_item_total_price
+from .services import update_seller_total_products, update_products_has_promo_on_promo_save, update_products_has_promo_on_promo_delete, update_products_has_promo_on_m2m_change
 
 #USER
 class User(models.Model):
@@ -317,23 +317,14 @@ class CartItem(models.Model):
                 new_id = "citid00125"
             self.cart_item_id = new_id
         
-        # Calculate total_item_price before saving using the service function
+        # Calculate total_price before saving
         if self.product_id:
-            self.total_item_price = calculate_cart_item_total_price(self.product_id, self.quantity)
+            product_price = self.product_id.product_discountedPrice if self.product_id.is_discounted else self.product_id.product_price
+            self.total_price = product_price * self.quantity
         
         super().save(*args, **kwargs)
 
-@receiver(post_save, sender=CartItem)
-def update_cart_total_price_on_save(sender, instance, **kwargs):
-    """Update the cart's total price when a cart item is saved."""
-    if instance.cart_id:
-        update_cart_total_price(instance.cart_id)
 
-@receiver(post_delete, sender=CartItem)
-def update_cart_total_price_on_delete(sender, instance, **kwargs):
-    """Update the cart's total price when a cart item is deleted."""
-    if instance.cart_id:
-        update_cart_total_price(instance.cart_id)
 
 
 #ORDER

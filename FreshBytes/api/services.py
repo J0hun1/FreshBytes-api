@@ -68,28 +68,3 @@ def update_products_has_promo_on_m2m_change(promo, action, pk_set=None):
 
 
 #CART LOGIC
-
-def calculate_cart_item_total_price(product, quantity):
-    """
-    Calculates the total price for a cart item based on product price and quantity.
-    Uses discounted price if available, otherwise uses regular price.
-    """
-    if not product:
-        return 0
-    
-    # Use discounted price if the product is discounted, otherwise use regular price
-    if product.is_discounted and product.product_discountedPrice:
-        unit_price = product.product_discountedPrice
-    else:
-        unit_price = product.product_price
-    
-    return unit_price * quantity
-
-def update_cart_total_price(cart):
-    """
-    Updates the total_price for a given cart.
-    """
-    cart_items = cart.cartitem_set.all()
-    total_price = sum(item.total_item_price for item in cart_items)
-    cart.total_price = total_price
-    cart.save(update_fields=['total_price'])
