@@ -3,7 +3,7 @@ from django.contrib.postgres.fields import ArrayField
 from django.utils import timezone
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
-from .services import update_seller_total_products, update_products_has_promo_on_promo_save, update_products_has_promo_on_promo_delete, update_products_has_promo_on_m2m_change, update_cart_total_price
+from .services import update_seller_total_products, update_products_has_promo_on_promo_save, update_products_has_promo_on_promo_delete, update_products_has_promo_on_m2m_change, update_cart_total_price, calculate_cart_item_total_price
 
 #USER
 class User(models.Model):
@@ -76,7 +76,7 @@ class Category(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        db_table = 'Categories'
+        verbose_name_plural = 'Categories'
 
 #SUBCATEGORY
 class SubCategory(models.Model):
@@ -298,7 +298,7 @@ class CartItem(models.Model):
     cart_id = models.ForeignKey(Cart, on_delete=models.CASCADE, null=True)
     product_id = models.ForeignKey(Product, on_delete=models.CASCADE, null=True)
     quantity = models.IntegerField(default=1)
-    total_price = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    total_item_price = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     discount_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     discount_percentage = models.IntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -317,10 +317,9 @@ class CartItem(models.Model):
                 new_id = "citid00125"
             self.cart_item_id = new_id
         
-        # Calculate total_price before saving
+        # Calculate total_item_price before saving using the service function
         if self.product_id:
-            product_price = self.product_id.product_discountedPrice if self.product_id.is_discounted else self.product_id.product_price
-            self.total_price = product_price * self.quantity
+            self.total_item_price = calculate_cart_item_total_price(self.product_id, self.quantity)
         
         super().save(*args, **kwargs)
 

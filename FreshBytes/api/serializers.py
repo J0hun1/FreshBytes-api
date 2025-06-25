@@ -49,9 +49,9 @@ class PromoSerializer(serializers.ModelSerializer):
 class CartSerializer(serializers.ModelSerializer):
     class Meta:
         model = Cart
-        fields = ["cart_id", "user_id", "created_at", "updated_at"]
+        fields = ["cart_id", "user_id", "total_price", "created_at", "updated_at"]
 
 class CartItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = CartItem
-        fields = ["cart_item_id", "cart_id", "product_id", "quantity", "total_price", "discount_amount", "discount_percentage", "created_at", "updated_at"]
+        fields = ["cart_item_id", "cart_id", "product_id", "quantity", "total_item_price", "discount_amount", "discount_percentage", "created_at", "updated_at"]
