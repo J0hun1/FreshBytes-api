@@ -288,7 +288,6 @@ class Cart(models.Model):
         super().save(*args, **kwargs)
         
     user_id = models.OneToOneField(User, on_delete=models.CASCADE, null=True)
-    total_price = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -325,10 +324,28 @@ class CartItem(models.Model):
         super().save(*args, **kwargs)
 
 
-
-
 #ORDER
+class OrderStatus(models.TextChoices):
+    PENDING = 'PENDING', 'Pending'
+    CONFIRMED = 'CONFIRMED', 'Confirmed'
+    SHIPPED = 'SHIPPED', 'Shipped'
+    DELIVERED = 'DELIVERED', 'Delivered'
+    CANCELLED = 'CANCELLED', 'Cancelled'
+    REFUNDED = 'REFUNDED', 'Refunded'
 
+class Order(models.Model):
+    order_id = models.CharField(primary_key=True, max_length=12, unique=True, editable=False)
+    user_id = models.ForeignKey(User, on_delete=models.CASCADE, null=True)
+    order_date = models.DateTimeField(auto_now_add=True)
+    order_total = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    discount_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    discount_percentage = models.IntegerField(default=0)
+    order_status = models.CharField(max_length=255, choices=OrderStatus.choices, default=OrderStatus.PENDING)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        db_table = 'Orders'
 
 
 #ORDER ITEMS

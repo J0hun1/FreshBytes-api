@@ -53,5 +53,10 @@ urlpatterns = [
         path("promos/<str:pk>/", views.PromoPostRetrieveUpdateDestroy.as_view(), name="update-delete-promo"),
 
     #CART
-        
+        path("carts/", views.CartPostListCreate.as_view(), name="carts"),
+        path("cart-items/", views.CartItemPostListCreate.as_view(), name="cart-items"),
+
+    #ORDERS 
+        path("orders/", views.OrderPostListCreate.as_view(), name="orders"),
+        path("orders/<str:pk>/", views.OrderPostRetrieveUpdateDestroy.as_view(), name="update-delete-order"),
 ]

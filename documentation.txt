@@ -20,6 +20,9 @@ creating new admin:
 to run/test python api:
     python manage.py runserver
 
+to create a graph model of present tables:
+    ./manage.py graph_models api > <file>
+
 notes:
     apps - ways to separate different logics (the api directory in this project's case)
     models - where we define different db models (models.py)
