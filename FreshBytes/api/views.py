@@ -1,8 +1,8 @@
 from django.shortcuts import render
 from rest_framework import generics, status
 from rest_framework.views import APIView
-from .models import Product, Category, User, Seller, SubCategory, Reviews, Promo, Cart, CartItem, Order
-from .serializers import ProductSerializer, CategorySerializer, UserSerializer, SellerSerializer, SubCategorySerializer, ReviewsSerializer, PromoSerializer, CartSerializer, CartItemSerializer, OrderSerializer
+from .models import Product, Category, User, Seller, SubCategory, Reviews, Promo, Cart, CartItem, Order, OrderItem
+from .serializers import ProductSerializer, CategorySerializer, UserSerializer, SellerSerializer, SubCategorySerializer, ReviewsSerializer, PromoSerializer, CartSerializer, CartItemSerializer, OrderSerializer, OrderItemSerializer
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 
@@ -191,6 +191,9 @@ class CartItemPostListCreate(generics.ListCreateAPIView):
         CartItem.objects.all().delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
     
+
+#ORDERS
+    
 class OrderPostListCreate(generics.ListCreateAPIView):
     queryset = Order.objects.all()
     serializer_class = OrderSerializer
@@ -204,3 +207,15 @@ class OrderPostRetrieveUpdateDestroy(generics.RetrieveUpdateDestroyAPIView):
     queryset = Order.objects.all()
     serializer_class = OrderSerializer
     lookup_field = "pk"
+
+
+#ORDER ITEMS
+
+class OrderItemPostListCreate(generics.ListCreateAPIView):
+    queryset = OrderItem.objects.all()
+    serializer_class = OrderItemSerializer
+
+    def delete(self, request, *args, **kwargs):
+        #deletes all order items
+        OrderItem.objects.all().delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)

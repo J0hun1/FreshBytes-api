@@ -9,6 +9,7 @@ from .models import Promo
 from .models import Cart
 from .models import CartItem
 from .models import Order
+from .models import OrderItem
 
 class ProductSerializer(serializers.ModelSerializer):
     class Meta:
@@ -61,3 +62,8 @@ class OrderSerializer(serializers.ModelSerializer):
     class Meta:
         model = Order
         fields = ["order_id", "user_id", "order_date", "order_total", "discount_amount", "discount_percentage", "order_status", "created_at", "updated_at"]
+
+class OrderItemSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = OrderItem
+        fields = ["order_item_id", "order_id", "product_id", "quantity", "total_item_price", "discount_amount", "created_at", "updated_at"]

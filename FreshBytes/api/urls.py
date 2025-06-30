@@ -59,4 +59,7 @@ urlpatterns = [
     #ORDERS 
         path("orders/", views.OrderPostListCreate.as_view(), name="orders"),
         path("orders/<str:pk>/", views.OrderPostRetrieveUpdateDestroy.as_view(), name="update-delete-order"),
+
+    #ORDER ITEMS
+        path("order-items/", views.OrderItemPostListCreate.as_view(), name="order-items"),  
 ]

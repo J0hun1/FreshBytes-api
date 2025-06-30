@@ -319,7 +319,7 @@ class CartItem(models.Model):
         # Calculate total_price before saving
         if self.product_id:
             product_price = self.product_id.product_discountedPrice if self.product_id.is_discounted else self.product_id.product_price
-            self.total_price = product_price * self.quantity
+            self.total_item_price = product_price * self.quantity
         
         super().save(*args, **kwargs)
 
@@ -349,7 +349,18 @@ class Order(models.Model):
 
 
 #ORDER ITEMS
-
+class OrderItem(models.Model):
+    order_item_id = models.CharField(primary_key=True, max_length=12, unique=True, editable=False)
+    order_id = models.ForeignKey(Order, on_delete=models.CASCADE, null=True)
+    product_id = models.ForeignKey(Product, on_delete=models.CASCADE, null=True)
+    quantity = models.IntegerField(default=1)
+    total_item_price = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    discount_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        db_table = 'OrderItems'
 
 
 #ORDER STATUS
