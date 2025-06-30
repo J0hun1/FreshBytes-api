@@ -1,12 +1,15 @@
-from django.urls import path
+from django.urls import path, include
 from . import views
 from django.contrib import admin
+from rest_framework.routers import DefaultRouter
+
+
 
 urlpatterns = [
     path("admin/", admin.site.urls),
 
     # ALL DATA - Get all data from all models in one endpoint
-    path("all-data/", views.AllDataView.as_view(), name="all-data"),
+    path("/", views.AllDataView.as_view(), name="all-data"),
 
     #PRODUCTS 
         # list and create products
@@ -15,6 +18,9 @@ urlpatterns = [
         # access, update, and delete individual products
         path("products/<str:pk>/", views.ProductPostRetrieveUpdateDestroy.as_view(), name="update-delete-product"),
         path("products/<str:pk>", views.ProductPostRetrieveUpdateDestroy.as_view(), name="update-delete-product-no-slash"),
+
+    
+       
 
     #CATEGORIES 
         # list and create categories

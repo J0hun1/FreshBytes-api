@@ -1,10 +1,13 @@
 from django.shortcuts import render
-from rest_framework import generics, status
+from rest_framework import generics, status, viewsets
 from rest_framework.views import APIView
 from .models import Product, Category, User, Seller, SubCategory, Reviews, Promo, Cart, CartItem, Order, OrderItem
 from .serializers import ProductSerializer, CategorySerializer, UserSerializer, SellerSerializer, SubCategorySerializer, ReviewsSerializer, PromoSerializer, CartSerializer, CartItemSerializer, OrderSerializer, OrderItemSerializer
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.filters import SearchFilter, OrderingFilter
+from django_filters.rest_framework import DjangoFilterBackend
+
 
 # Create your views here.
 
@@ -68,6 +71,7 @@ class ProductPostListCreate(generics.ListCreateAPIView):
         Product.objects.all().delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
     
+
 
 #allows to access, update, and delete individual products
 class ProductPostRetrieveUpdateDestroy(generics.RetrieveUpdateDestroyAPIView):
@@ -155,6 +159,8 @@ class ReviewsPostRetrieveUpdateDestroy(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = ReviewsSerializer
     lookup_field = "pk"
 
+
+
 #PROMO
 class PromoPostListCreate(generics.ListCreateAPIView):
     queryset = Promo.objects.all()
@@ -172,7 +178,6 @@ class PromoPostRetrieveUpdateDestroy(generics.RetrieveUpdateDestroyAPIView):
 
 
 #CART
-
 class CartPostListCreate(generics.ListCreateAPIView):
     queryset = Cart.objects.all()
     serializer_class = CartSerializer

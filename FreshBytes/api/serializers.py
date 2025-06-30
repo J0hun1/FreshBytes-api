@@ -12,9 +12,22 @@ from .models import Order
 from .models import OrderItem
 
 class ProductSerializer(serializers.ModelSerializer):
+    category_id = serializers.SerializerMethodField(read_only=True)
+
     class Meta:
         model = Product
-        fields = ["product_id", "user_id", "seller_id", "product_name", "product_price", "product_brief_description", "product_full_description", "product_discountedPrice", "product_sku", "product_status", "product_location", "category_id", "sub_category_id", "quantity", "post_date", "harvest_date", "is_active", "review_count", "top_rated", "discounted_amount", "is_discounted", "is_srp", "is_deleted", "sell_count", "offer_start_date", "offer_end_date", "created_at", "updated_at", "has_promo"]
+        fields = [
+            "product_id", "user_id", "seller_id", "product_name", "product_price", "product_brief_description", "product_full_description", "product_discountedPrice", "product_sku", "product_status", "product_location", "sub_category_id", "category_id", "quantity", "post_date", "harvest_date", "is_active", "review_count", "top_rated", "discounted_amount", "is_discounted", "is_srp", "is_deleted", "sell_count", "offer_start_date", "offer_end_date", "created_at", "updated_at", "has_promo"
+        ]
+
+    def get_category_id(self, obj):
+        return obj.category_id.category_id if obj.category_id else None
+
+    def validate_product_price(self, value):
+        if value <= 0:
+            raise serializers.ValidationError("Product price must be greater than 0.")
+        return value
+    
 
 class CategorySerializer(serializers.ModelSerializer):
     class Meta:
@@ -46,7 +59,20 @@ class PromoSerializer(serializers.ModelSerializer):
     class Meta:
         model = Promo
         fields = ["promo_id", "seller_id", "product_id", "promo_name", "promo_description", "discount_type", "discount_amount", "discount_percentage", "promo_start_date", "promo_end_date", "is_active", "created_at", "updated_at"]
-
+        
+        def validate_promos(self, data):
+            discount_type = data.get('discount_type')
+            discount_percentage = data.get('discount_percentage')
+            discount_amount = data.get('discount_amount')
+            
+            if discount_type == 'percentage' and not discount_percentage:
+                raise serializers.ValidationError("discount_percentage is required for percentage discount type.")
+            if discount_type == 'fixed' and not discount_amount:
+                raise serializers.ValidationError("discount_amount is required for fixed discount type.")
+            if data.get('promo_start_date') >= data.get('promo_end_date'):
+                raise serializers.ValidationError("promo_end_date must be after promo_start_date.")
+            return data
+        
 
 class CartSerializer(serializers.ModelSerializer):
     class Meta:

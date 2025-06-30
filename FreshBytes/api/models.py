@@ -136,6 +136,10 @@ class Product(models.Model):
     def user_id(self):
         return self.seller_id.user_id.user_id if self.seller_id and self.seller_id.user_id else None
 
+    @property
+    def category_id(self):
+        """Get the category through the subcategory relationship"""
+        return self.sub_category_id.category_id if self.sub_category_id else None
 
     seller_id = models.ForeignKey(Seller, on_delete=models.CASCADE, null=True)
     product_name = models.CharField(max_length=255)
@@ -146,7 +150,6 @@ class Product(models.Model):
     product_sku = models.CharField(max_length=255)
     product_status = models.CharField(max_length=20, choices=ProductStatus.choices, default=ProductStatus.FRESH)
     product_location = models.CharField(max_length=255, null=True)
-    category_id = models.ForeignKey(Category, on_delete=models.CASCADE, null=True)
     sub_category_id = models.ForeignKey(SubCategory, on_delete=models.CASCADE, null=True)
     has_promo = models.BooleanField(default=False)
     weight = models.DecimalField(max_digits=10, decimal_places=2, default=0)
