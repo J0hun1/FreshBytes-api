@@ -338,6 +338,17 @@ class OrderStatus(models.TextChoices):
 
 class Order(models.Model):
     order_id = models.CharField(primary_key=True, max_length=12, unique=True, editable=False)
+    
+    def save(self, *args, **kwargs):
+        if not self.order_id:
+            last_order = Order.objects.order_by('-created_at').first()
+            if last_order:
+                last_id = int(last_order.order_id[7:10])  # Extract the numeric part after 'orderid'
+                new_id = f"oid{last_id + 1:03d}25"
+            else:
+                new_id = "oid00125"
+            self.order_id = new_id
+        super().save(*args, **kwargs)
     user_id = models.ForeignKey(User, on_delete=models.CASCADE, null=True)
     order_date = models.DateTimeField(auto_now_add=True)
     order_total = models.DecimalField(max_digits=10, decimal_places=2, default=0)
@@ -361,6 +372,26 @@ class OrderItem(models.Model):
     discount_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    
+    def save(self, *args, **kwargs):
+        if not self.order_item_id:
+            last_order_item = OrderItem.objects.order_by('-created_at').first()
+            if last_order_item and last_order_item.order_item_id and len(last_order_item.order_item_id) >= 8:
+                try:
+                    last_id = int(last_order_item.order_item_id[5:8])  # Extract the numeric part after 'oitid'
+                    new_id = f"oitid{last_id + 1:03d}25"
+                except (ValueError, IndexError):
+                    new_id = "oitid00125"
+            else:
+                new_id = "oitid00125"
+            self.order_item_id = new_id
+        
+        # Calculate total_item_price before saving
+        if self.product_id:
+            product_price = self.product_id.product_discountedPrice if self.product_id.is_discounted else self.product_id.product_price
+            self.total_item_price = product_price * self.quantity
+        
+        super().save(*args, **kwargs)
     
     class Meta:
         db_table = 'OrderItems'
