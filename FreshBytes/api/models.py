@@ -3,39 +3,89 @@ from django.contrib.postgres.fields import ArrayField
 from django.utils import timezone
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
+from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
+from django.contrib.auth.hashers import make_password
 from .services import update_seller_total_products, update_products_has_promo_on_promo_save, update_products_has_promo_on_promo_delete, update_products_has_promo_on_m2m_change
 
-#USER
-class User(models.Model):
-    user_id = models.CharField(primary_key=True, max_length=5, unique=True, editable=False)
+class UserManager(BaseUserManager):
+    def create_user(self, user_email, password=None, **extra_fields):
+        if not user_email:
+            raise ValueError('The Email field must be set')
+        user_email = self.normalize_email(user_email)
+        user = self.model(user_email=user_email, **extra_fields)
+        if password:
+            user.set_password(password)
+        else:
+            user.set_password('defaultpassword123')
+        user.save(using=self._db)
+        return user
+
+    def create_superuser(self, user_email, password=None, **extra_fields):
+        extra_fields.setdefault('is_staff', True)
+        extra_fields.setdefault('is_superuser', True)
+        extra_fields.setdefault('is_admin', True)
+        extra_fields.setdefault('role', 'admin')
+        extra_fields.setdefault('is_active', True)
+
+        if extra_fields.get('is_staff') is not True:
+            raise ValueError('Superuser must have is_staff=True.')
+        if extra_fields.get('is_superuser') is not True:
+            raise ValueError('Superuser must have is_superuser=True.')
+
+        return self.create_user(user_email, password, **extra_fields)
+
+class User(AbstractBaseUser, PermissionsMixin):
+    ROLE_CHOICES = [
+        ('admin', 'Admin'),
+        ('staff', 'Staff'),
+        ('seller', 'Seller'),
+        ('customer', 'Customer'),
+    ]
+
+    user_id = models.CharField(primary_key=True, max_length=10, unique=True, editable=False)
+    user_name = models.CharField(max_length=255)
+    first_name = models.CharField(max_length=255)
+    last_name = models.CharField(max_length=255)
+    user_email = models.EmailField(unique=True, null=True)
+    password = models.CharField(max_length=128, null=True)  # Remove default password
+    user_phone = models.CharField(max_length=255)
+    user_address = models.CharField(max_length=255)
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='customer')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    is_active = models.BooleanField(default=True)
+    is_staff = models.BooleanField(default=False)
+    is_superuser = models.BooleanField(default=False)
+    is_deleted = models.BooleanField(default=False)
+    is_admin = models.BooleanField(default=False)
+
+    objects = UserManager()
+
+    USERNAME_FIELD = 'user_email'
+    REQUIRED_FIELDS = ['user_name', 'first_name', 'last_name']
 
     def save(self, *args, **kwargs):
         if not self.user_id:
-            current_year = timezone.now().year % 100  # Get last two digits of the current year
+            current_year = timezone.now().year % 100
             last_user = User.objects.order_by('-created_at').first()
             if last_user:
-                last_id = int(last_user.user_id[3:6])  # Extract the numeric part after 'uid'
+                last_id = int(last_user.user_id[3:6])
                 new_id = f"uid{last_id + 1:03d}{current_year:02d}"
             else:
                 new_id = f"uid00125"
             self.user_id = new_id
         super().save(*args, **kwargs)
-    user_name = models.CharField(max_length=255)
-    first_name = models.CharField(max_length=255)
-    last_name = models.CharField(max_length=255)
-    user_email = models.EmailField(unique=True)
-    user_password = models.CharField(max_length=255)
-    user_phone = models.CharField(max_length=255)
-    user_address = models.CharField(max_length=255)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    is_active = models.BooleanField(default=True)
-    is_deleted = models.BooleanField(default=False)
-    is_admin = models.BooleanField(default=False)
-    
+
+    def __str__(self):
+        return self.user_email
+
+    class Meta:
+        verbose_name = 'User'
+        verbose_name_plural = 'Users'
+
 #SELLER
 class Seller(models.Model):
-    seller_id = models.CharField(primary_key=True, max_length=8, unique=True, editable=False)
+    seller_id = models.CharField(primary_key=True, max_length=10, unique=True, editable=False)
 
     def save(self, *args, **kwargs):
         if not self.seller_id:
@@ -107,7 +157,7 @@ class ProductStatus(models.TextChoices):
     FRESH = 'FRESH', 'Fresh'
     
 class Product(models.Model):
-    product_id = models.CharField(primary_key=True, max_length=8, unique=True, editable=False)
+    product_id = models.CharField(primary_key=True, max_length=10, unique=True, editable=False)
 
     def save(self, *args, **kwargs):
         if not self.product_id:
@@ -196,7 +246,7 @@ def update_seller_product_count_on_delete(sender, instance, **kwargs):
 
 #REVIEWS
 class Reviews(models.Model):
-    review_id = models.CharField(primary_key=True, max_length=12, unique=True, editable=False)
+    review_id = models.CharField(primary_key=True, max_length=10, unique=True, editable=False)
 
     def save(self, *args, **kwargs):
         if not self.review_id:
@@ -227,7 +277,7 @@ class Discount_Type(models.TextChoices):
     FIXED = 'FIXED', 'Fixed'
 
 class Promo(models.Model):
-    promo_id = models.CharField(primary_key=True, max_length=12, unique=True, editable=False)
+    promo_id = models.CharField(primary_key=True, max_length=10, unique=True, editable=False)
     seller_id = models.ForeignKey(Seller, on_delete=models.CASCADE, default=None)
     product_id = models.ManyToManyField(Product, related_name='promos')
 
@@ -277,7 +327,7 @@ def update_product_has_promo_on_m2m_change(sender, instance, action, pk_set, **k
 
 #CART
 class Cart(models.Model):
-    cart_id = models.CharField(primary_key=True, max_length=12, unique=True, editable=False)
+    cart_id = models.CharField(primary_key=True, max_length=10, unique=True, editable=False)
 
     def save(self, *args, **kwargs):
         if not self.cart_id:
@@ -337,7 +387,7 @@ class OrderStatus(models.TextChoices):
     REFUNDED = 'REFUNDED', 'Refunded'
 
 class Order(models.Model):
-    order_id = models.CharField(primary_key=True, max_length=12, unique=True, editable=False)
+    order_id = models.CharField(primary_key=True, max_length=10, unique=True, editable=False)
     
     def save(self, *args, **kwargs):
         if not self.order_id:
@@ -364,7 +414,7 @@ class Order(models.Model):
 
 #ORDER ITEMS
 class OrderItem(models.Model):
-    order_item_id = models.CharField(primary_key=True, max_length=12, unique=True, editable=False)
+    order_item_id = models.CharField(primary_key=True, max_length=10, unique=True, editable=False)
     order_id = models.ForeignKey(Order, on_delete=models.CASCADE, null=True)
     product_id = models.ForeignKey(Product, on_delete=models.CASCADE, null=True)
     quantity = models.IntegerField(default=1)

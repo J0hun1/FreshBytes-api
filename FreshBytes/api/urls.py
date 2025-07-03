@@ -2,11 +2,19 @@ from django.urls import path, include
 from . import views
 from django.contrib import admin
 from rest_framework.routers import DefaultRouter
+from rest_framework_simplejwt.views import TokenRefreshView
 
 
 
 urlpatterns = [
     path("admin/", admin.site.urls),
+
+    # Authentication endpoints
+    path("auth/login/", views.CustomTokenObtainPairView.as_view(), name="token_obtain_pair"),
+    path("auth/login/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
+    path("auth/register/", views.RegisterView.as_view(), name="auth_register"),
+    path("auth/logout/", views.LogoutView.as_view(), name="auth_logout"),
+    path("auth/test/", views.TestAuthView.as_view(), name="test_auth"),
 
     # ALL DATA - Get all data from all models in one endpoint
     path("/", views.AllDataView.as_view(), name="all-data"),
@@ -18,10 +26,7 @@ urlpatterns = [
         # access, update, and delete individual products
         path("products/<str:pk>/", views.ProductPostRetrieveUpdateDestroy.as_view(), name="update-delete-product"),
         path("products/<str:pk>", views.ProductPostRetrieveUpdateDestroy.as_view(), name="update-delete-product-no-slash"),
-
-    
-       
-
+        
     #CATEGORIES 
         # list and create categories
         path("categories/", views.CategoryPostListCreate.as_view(), name="categories"),

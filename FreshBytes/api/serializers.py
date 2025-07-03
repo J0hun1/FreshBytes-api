@@ -10,6 +10,21 @@ from .models import Cart
 from .models import CartItem
 from .models import Order
 from .models import OrderItem
+from django.contrib.auth import get_user_model
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from django.contrib.auth.hashers import make_password
+
+User = get_user_model()
+
+class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
+    @classmethod
+    def get_token(cls, user):
+        token = super().get_token(user)
+        # Add custom claims
+        token['user_email'] = user.user_email
+        token['role'] = user.role
+        token['user_name'] = user.user_name
+        return token
 
 class ProductSerializer(serializers.ModelSerializer):
     category_id = serializers.SerializerMethodField(read_only=True)
@@ -41,9 +56,30 @@ class SubCategorySerializer(serializers.ModelSerializer):
 
 
 class UserSerializer(serializers.ModelSerializer):
+    password = serializers.CharField(write_only=True, required=True)
+    
     class Meta:
         model = User
-        fields = ["user_id", "user_name", "first_name", "last_name", "user_email", "user_password", "user_phone", "user_address", "created_at", "updated_at", "is_active", "is_deleted", "is_admin"]
+        fields = ['user_id', 'user_name', 'first_name', 'last_name', 'user_email', 
+                 'password', 'user_phone', 'user_address', 'role', 'created_at', 
+                 'updated_at', 'is_active', 'is_deleted', 'is_admin', 'is_staff', 'is_superuser']
+        read_only_fields = ['user_id', 'created_at', 'updated_at']
+        extra_kwargs = {
+            'password': {'write_only': True}
+        }
+
+    def create(self, validated_data):
+        validated_data['password'] = make_password(validated_data.get('password'))
+        if validated_data.get('role') == 'admin':
+            validated_data['is_staff'] = True
+            validated_data['is_superuser'] = True
+            validated_data['is_admin'] = True
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        if 'password' in validated_data:
+            validated_data['password'] = make_password(validated_data.get('password'))
+        return super().update(instance, validated_data)
 
 class SellerSerializer(serializers.ModelSerializer):
     class Meta:

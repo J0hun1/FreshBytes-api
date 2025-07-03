@@ -1,18 +1,63 @@
 from django.shortcuts import render
 from rest_framework import generics, status, viewsets
 from rest_framework.views import APIView
-from .models import Product, Category, User, Seller, SubCategory, Reviews, Promo, Cart, CartItem, Order, OrderItem
-from .serializers import ProductSerializer, CategorySerializer, UserSerializer, SellerSerializer, SubCategorySerializer, ReviewsSerializer, PromoSerializer, CartSerializer, CartItemSerializer, OrderSerializer, OrderItemSerializer
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, BasePermission, AllowAny
 from rest_framework.filters import SearchFilter, OrderingFilter
 from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework_simplejwt.views import TokenObtainPairView
+from rest_framework_simplejwt.tokens import RefreshToken
+from .models import Product, Category, User, Seller, SubCategory, Reviews, Promo, Cart, CartItem, Order, OrderItem
+from .serializers import (
+    ProductSerializer, CategorySerializer, UserSerializer, SellerSerializer, 
+    SubCategorySerializer, ReviewsSerializer, PromoSerializer, CartSerializer, 
+    CartItemSerializer, OrderSerializer, OrderItemSerializer, CustomTokenObtainPairSerializer
+)
 
+# Custom permission classes
+class IsAdmin(BasePermission):
+    def has_permission(self, request, view):
+        return request.user and request.user.role == 'admin'
+
+class IsStaff(BasePermission):
+    def has_permission(self, request, view):
+        return request.user and request.user.role == 'staff'
+
+class IsSeller(BasePermission):
+    def has_permission(self, request, view):
+        return request.user and request.user.role == 'seller'
+
+class IsCustomer(BasePermission):
+    def has_permission(self, request, view):
+        return request.user and request.user.role == 'customer'
+
+# Authentication Views
+class CustomTokenObtainPairView(TokenObtainPairView):
+    permission_classes = [AllowAny]
+    serializer_class = CustomTokenObtainPairSerializer
+
+class RegisterView(generics.CreateAPIView):
+    permission_classes = [AllowAny]
+    queryset = User.objects.all()
+    serializer_class = UserSerializer
+
+class LogoutView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        try:
+            refresh_token = request.data["refresh_token"]
+            token = RefreshToken(refresh_token)
+            token.blacklist()
+            return Response({"message": "Successfully logged out."}, status=status.HTTP_200_OK)
+        except Exception:
+            return Response({"error": "Invalid token."}, status=status.HTTP_400_BAD_REQUEST)
 
 # Create your views here.
 
 # ALL DATA VIEW - Returns all data from all models
 class AllDataView(APIView):
+    permission_classes = [IsAuthenticated, IsAdmin|IsStaff]
     def get(self, request):
         """Get all data from all models in a single response"""
         try:
@@ -116,9 +161,12 @@ class SubCategoryPostRetrieveUpdateDestroy(generics.RetrieveUpdateDestroyAPIView
 class UserPostListCreate(generics.ListCreateAPIView):
     queryset = User.objects.all()
     serializer_class = UserSerializer
+    permission_classes = [IsAuthenticated, IsAdmin|IsStaff]
 
     def delete(self, request, *args, **kwargs):
-        #deletes all users
+        if not (request.user.role == 'admin'):
+            return Response({"error": "Only admins can perform this action."}, 
+                          status=status.HTTP_403_FORBIDDEN)
         User.objects.all().delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -126,7 +174,19 @@ class UserPostListCreate(generics.ListCreateAPIView):
 class UserPostRetrieveUpdateDestroy(generics.RetrieveUpdateDestroyAPIView):
     queryset = User.objects.all()
     serializer_class = UserSerializer
+    permission_classes = [IsAuthenticated]
     lookup_field = "pk"
+
+    def get_permissions(self):
+        if self.request.method in ['DELETE']:
+            return [IsAuthenticated(), IsAdmin()]
+        return [IsAuthenticated()]
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.role == 'admin':
+            return User.objects.all()
+        return User.objects.filter(user_id=user.user_id)
 
 
 #SELLERS
@@ -224,3 +284,17 @@ class OrderItemPostListCreate(generics.ListCreateAPIView):
         #deletes all order items
         OrderItem.objects.all().delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+# Add this new test view
+class TestAuthView(APIView):
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        return Response({
+            'message': 'Authentication successful!',
+            'user': {
+                'email': request.user.user_email,
+                'role': request.user.role,
+                'name': request.user.user_name
+            }
+        })
