@@ -36,10 +36,9 @@ class UserManager(BaseUserManager):
 
 class User(AbstractBaseUser, PermissionsMixin):
     ROLE_CHOICES = [
-        ('admin', 'Admin'),
-        ('staff', 'Staff'),
-        ('seller', 'Seller'),
-        ('customer', 'Customer'),
+        ('admin', 'Admin'),  # Has full access to both Django admin and application features
+        ('seller', 'Seller'),  # Can manage their products and sales
+        ('customer', 'Customer'),  # Can make purchases and write reviews
     ]
 
     user_id = models.CharField(primary_key=True, max_length=10, unique=True, editable=False)
@@ -47,22 +46,28 @@ class User(AbstractBaseUser, PermissionsMixin):
     first_name = models.CharField(max_length=255)
     last_name = models.CharField(max_length=255)
     user_email = models.EmailField(unique=True, null=True)
-    password = models.CharField(max_length=128, null=True)  # Remove default password
+    password = models.CharField(max_length=128, null=True)
     user_phone = models.CharField(max_length=255)
     user_address = models.CharField(max_length=255)
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='customer')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    is_active = models.BooleanField(default=True)
-    is_staff = models.BooleanField(default=False)
-    is_superuser = models.BooleanField(default=False)
+    
+    # Django's built-in permission flags
+    is_active = models.BooleanField(default=True)  # Can login
+    is_staff = models.BooleanField(default=False)  # Can access Django admin
+    is_superuser = models.BooleanField(default=False)  # Has all permissions
     is_deleted = models.BooleanField(default=False)
-    is_admin = models.BooleanField(default=False)
 
     objects = UserManager()
 
     USERNAME_FIELD = 'user_email'
     REQUIRED_FIELDS = ['user_name', 'first_name', 'last_name']
+
+    @property
+    def is_admin(self):
+        """Property to maintain compatibility - returns True if role is admin"""
+        return self.role == 'admin'
 
     def save(self, *args, **kwargs):
         if not self.user_id:
@@ -74,6 +79,12 @@ class User(AbstractBaseUser, PermissionsMixin):
             else:
                 new_id = f"uid00125"
             self.user_id = new_id
+
+        # Ensure Django admin access for admin role
+        if self.role == 'admin':
+            self.is_staff = True
+            self.is_superuser = True
+        
         super().save(*args, **kwargs)
 
     def __str__(self):

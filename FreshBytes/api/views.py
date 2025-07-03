@@ -19,10 +19,6 @@ class IsAdmin(BasePermission):
     def has_permission(self, request, view):
         return request.user and request.user.role == 'admin'
 
-class IsStaff(BasePermission):
-    def has_permission(self, request, view):
-        return request.user and request.user.role == 'staff'
-
 class IsSeller(BasePermission):
     def has_permission(self, request, view):
         return request.user and request.user.role == 'seller'
@@ -57,7 +53,7 @@ class LogoutView(APIView):
 
 # ALL DATA VIEW - Returns all data from all models
 class AllDataView(APIView):
-    permission_classes = [IsAuthenticated, IsAdmin|IsStaff]
+    permission_classes = [IsAuthenticated, IsAdmin]  # Only admins can access all data
     def get(self, request):
         """Get all data from all models in a single response"""
         try:
@@ -161,7 +157,7 @@ class SubCategoryPostRetrieveUpdateDestroy(generics.RetrieveUpdateDestroyAPIView
 class UserPostListCreate(generics.ListCreateAPIView):
     queryset = User.objects.all()
     serializer_class = UserSerializer
-    permission_classes = [IsAuthenticated, IsAdmin|IsStaff]
+    permission_classes = [IsAuthenticated, IsAdmin]
 
     def delete(self, request, *args, **kwargs):
         if not (request.user.role == 'admin'):
