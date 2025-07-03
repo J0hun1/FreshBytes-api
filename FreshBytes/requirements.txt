@@ -2,3 +2,8 @@ django
 djangorestframework
 environs
 django-cors-headers
+django-filter
+psycopg
+psycopg2-binary
+Pillow
+django-redis
