@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+
+# Recursively ignore all __pycache__ folders and .pyc files
+**/__pycache__/
+**/*.pyc
+
+# Django
+*.log
+*.pot
+*.pyc
+*.pyo
+*.db
+*.sqlite3
+
+# VSCode
+.vscode/
+
+# Environments
+.env
+.venv/
+venv/
+ENV/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Ignore migrations cache
+**/__pycache__/
+
+# Ignore compiled files
+*.so
+*.egg-info/
+
+db.sqlite3
