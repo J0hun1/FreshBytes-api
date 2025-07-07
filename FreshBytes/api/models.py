@@ -45,7 +45,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     user_name = models.CharField(max_length=255)
     first_name = models.CharField(max_length=255)
     last_name = models.CharField(max_length=255)
-    user_email = models.EmailField(unique=True, null=True)
+    user_email = models.EmailField(unique=True, null=True)  # Keep nullable for regular users
     password = models.CharField(max_length=128, null=True)
     user_phone = models.CharField(max_length=255)
     user_address = models.CharField(max_length=255)
@@ -64,12 +64,15 @@ class User(AbstractBaseUser, PermissionsMixin):
     USERNAME_FIELD = 'user_email'
     REQUIRED_FIELDS = ['user_name', 'first_name', 'last_name']
 
-    @property
-    def is_admin(self):
-        """Property to maintain compatibility - returns True if role is admin"""
-        return self.role == 'admin'
+    def clean(self):
+        """Validate that sellers must have an email"""
+        if self.role == 'seller' and not self.user_email:
+            from django.core.exceptions import ValidationError
+            raise ValidationError('Sellers must have an email address')
+        super().clean()
 
     def save(self, *args, **kwargs):
+        self.clean()  # Run validation before saving
         if not self.user_id:
             current_year = timezone.now().year % 100
             last_user = User.objects.order_by('-created_at').first()
@@ -88,11 +91,18 @@ class User(AbstractBaseUser, PermissionsMixin):
         super().save(*args, **kwargs)
 
     def __str__(self):
-        return self.user_email
+        """Return the user_id as the string representation"""
+        return self.user_id
+
+    @property
+    def is_admin(self):
+        """Property to maintain compatibility - returns True if role is admin"""
+        return self.role == 'admin'
 
     class Meta:
         verbose_name = 'User'
         verbose_name_plural = 'Users'
+        db_table = 'Users'
 
 #SELLER
 class Seller(models.Model):
@@ -110,21 +120,59 @@ class Seller(models.Model):
         super().save(*args, **kwargs)
     user_id = models.ForeignKey(User, on_delete=models.CASCADE, null=True)
     business_name = models.CharField(default="", max_length=255)
-    business_email = models.EmailField(default="")
+    business_email = models.EmailField(blank=True)
     business_phone = models.IntegerField(default="")
     business_address = models.CharField(default="", max_length=255, null=True)
     total_earnings = models.DecimalField(max_digits=10, decimal_places=2, default=0, null=True)
-    total_products = models.IntegerField(default=0, null=True)
-    total_orders = models.IntegerField(default=0, null=True)
-    total_reviews = models.IntegerField(default=0, null=True)
-    average_rating = models.DecimalField(max_digits=3, decimal_places=2, default=0, null=True)
-    total_followers = models.IntegerField(default=0, null=True)
-    total_products_sold = models.IntegerField(default=0, null=True)
+    total_products = models.IntegerField(default=0)
+    total_orders = models.IntegerField(default=0)
+    total_reviews = models.IntegerField(default=0)
+    average_rating = models.DecimalField(max_digits=3, decimal_places=2, default=0)
+    total_followers = models.IntegerField(default=0)
+    total_likes = models.IntegerField(default=0)
+    total_products_sold = models.IntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     is_active = models.BooleanField(default=True)
     is_deleted = models.BooleanField(default=False)
 
+    def clean(self):
+        """Validate seller data before saving"""
+        from django.core.exceptions import ValidationError
+        if not self.user_id:
+            raise ValidationError('A seller must be associated with a user')
+        if not self.user_id.user_email:
+            raise ValidationError('The associated user must have an email address')
+        
+    def save(self, *args, **kwargs):
+        if not self.seller_id:
+            last_seller = Seller.objects.order_by('-created_at').first()
+            if last_seller:
+                last_id = int(last_seller.seller_id[3:6])  # Extract the numeric part after 'sid'
+                new_id = f"sid{last_id + 1:03d}25"
+            else:
+                new_id = "sid00125"
+            self.seller_id = new_id
+
+        # Ensure numeric fields are not null
+        self.total_products = self.total_products or 0
+        self.total_orders = self.total_orders or 0
+        self.total_reviews = self.total_reviews or 0
+        self.average_rating = self.average_rating or 0
+        self.total_followers = self.total_followers or 0
+        self.total_likes = self.total_likes or 0
+        self.total_products_sold = self.total_products_sold or 0
+
+        self.clean()  # Run validation
+        
+        # If business_email is blank, use user's email
+        if not self.business_email and self.user_id and self.user_id.user_email:
+            self.business_email = self.user_id.user_email
+            
+        super().save(*args, **kwargs)
+
+    class Meta:
+        db_table = 'Seller'
 
 #CATEGORY
 class Category(models.Model):
@@ -176,16 +224,6 @@ class Product(models.Model):
     product_full_description = models.CharField(max_length=255)
     product_discountedPrice = models.DecimalField(max_digits=10, decimal_places=2, null=True)
     product_sku = models.CharField(max_length=255, unique=True, editable=False)
-
-    def save(self, *args, **kwargs):
-        if not self.product_sku:
-            # Generate SKU
-            prefix = self.product_name[:3].upper() if len(self.product_name) >= 3 else self.product_name.upper()
-            seller_products_count = Product.objects.filter(seller_id=self.seller_id).count() + 1
-            seller_id_suffix = self.seller_id.seller_id[-5:] if len(self.seller_id.seller_id) >= 5 else self.seller_id.seller_id
-            self.product_sku = f"{prefix}{seller_products_count:03d}{seller_id_suffix}"
-        
-        super().save(*args, **kwargs)
     product_status = models.CharField(max_length=20, choices=ProductStatus.choices, default=ProductStatus.FRESH)
     product_location = models.CharField(max_length=255, null=True)
     sub_category_id = models.ForeignKey(SubCategory, on_delete=models.CASCADE, null=True)
@@ -201,8 +239,6 @@ class Product(models.Model):
     is_discounted = models.BooleanField(default=False)
     is_deleted = models.BooleanField(default=False)
     sell_count = models.IntegerField(default=0)
-    offer_start_date = models.DateTimeField(null=True)
-    offer_end_date = models.DateTimeField(null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -221,35 +257,77 @@ class Product(models.Model):
             return self.product_price - self.product_discountedPrice
         return None
 
+    def update_discounted_price(self):
+        """Update discounted price based on active promos"""
+        active_promos = self.promos.filter(
+            is_active=True,
+            promo_start_date__lte=timezone.now(),
+            promo_end_date__gte=timezone.now()
+        ).order_by('-discount_amount', '-discount_percentage')
+
+        if not active_promos.exists():
+            self.product_discountedPrice = None
+            self.is_discounted = False
+            self.has_promo = False
+            self.save()
+            return
+
+        # Get the promo with the highest discount
+        best_promo = active_promos.first()
+        
+        if best_promo.discount_type == Discount_Type.PERCENTAGE:
+            discount = (self.product_price * best_promo.discount_percentage) / 100
+        else:  # FIXED amount
+            discount = best_promo.discount_amount
+
+        self.product_discountedPrice = max(0, self.product_price - discount)
+        self.is_discounted = True
+        self.has_promo = True
+        self.save()
+
+    def generate_sku(self, counter=0):
+        """Generate a unique SKU with optional counter for conflict resolution"""
+        prefix = self.product_name[:3].upper() if len(self.product_name) >= 3 else self.product_name.upper()
+        seller_products_count = Product.objects.filter(seller_id=self.seller_id).count() + 1
+        seller_id_suffix = self.seller_id.seller_id[-5:] if self.seller_id and len(self.seller_id.seller_id) >= 5 else "00000"
+        
+        # Add counter to SKU if there's a conflict
+        if counter > 0:
+            return f"{prefix}{seller_products_count:03d}{seller_id_suffix}_{counter}"
+        return f"{prefix}{seller_products_count:03d}{seller_id_suffix}"
+
     def save(self, *args, **kwargs):
-        # Generate product_id if not exists
         if not self.product_id:
             last_product = Product.objects.order_by('-created_at').first()
             if last_product and last_product.product_id and len(last_product.product_id) >= 8:
                 try:
-                    last_id = int(last_product.product_id[4:7])  # Extract the numeric part after 'prod'
+                    last_id = int(last_product.product_id[4:7])
                     new_id = f"prod{last_id + 1:03d}25"
                 except (ValueError, IndexError):
                     new_id = "prod00125"
             else:
                 new_id = "prod00125"
             self.product_id = new_id
-        
-        # Generate SKU if not exists
+
+        # Generate unique SKU
         if not self.product_sku:
-            prefix = self.product_name[:3].upper() if len(self.product_name) >= 3 else self.product_name.upper()
-            seller_products_count = Product.objects.filter(seller_id=self.seller_id).count() + 1
-            seller_id_suffix = self.seller_id.seller_id[-5:] if self.seller_id and len(self.seller_id.seller_id) >= 5 else "00000"
-            self.product_sku = f"{prefix}{seller_products_count:03d}{seller_id_suffix}"
-        
-        # Set is_srp flag
+            counter = 0
+            while True:
+                try:
+                    self.product_sku = self.generate_sku(counter)
+                    # Try saving to check for conflicts
+                    if not Product.objects.filter(product_sku=self.product_sku).exists():
+                        break
+                    counter += 1
+                except Exception:
+                    counter += 1
+                # Prevent infinite loop
+                if counter > 1000:
+                    raise ValueError("Unable to generate unique SKU after 1000 attempts")
+
         if self.product_price > 0 and (self.product_discountedPrice is None or self.product_discountedPrice <= 0):
             self.is_srp = True
-        
-        # Set is_discounted flag
-        if self.discounted_amount is not None and self.discounted_amount > 0:
-            self.is_discounted = True
-            
+
         super().save(*args, **kwargs)
 
     class Meta:
@@ -305,49 +383,68 @@ class Promo(models.Model):
     promo_id = models.CharField(primary_key=True, max_length=10, unique=True, editable=False)
     seller_id = models.ForeignKey(Seller, on_delete=models.CASCADE, default=None)
     product_id = models.ManyToManyField(Product, related_name='promos')
-
-    def save(self, *args, **kwargs):
-        if not self.promo_id:
-            last_promo = Promo.objects.order_by('-created_at').first()
-            if last_promo:
-                last_id = int(last_promo.promo_id[3:6])  # Extract the numeric part after 'pid'
-                new_id = f"pid{last_id + 1:03d}25"
-            else:
-                new_id = "pid00125"
-            self.promo_id = new_id
-        super().save(*args, **kwargs)
     promo_description = models.CharField(max_length=255, default="")
     promo_name = models.CharField(max_length=255)
     discount_type = models.CharField(max_length=255, choices=Discount_Type.choices, default=Discount_Type.FIXED)
     discount_amount = models.IntegerField(default=0)
     discount_percentage = models.IntegerField(default=0)
     is_active = models.BooleanField(default=True)
-    promo_start_date = models.DateTimeField(null=True)
-    promo_end_date = models.DateTimeField(null=True)
+    promo_start_date = models.DateTimeField(default=timezone.now)
+    promo_end_date = models.DateTimeField(default=timezone.now)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    def save(self, *args, **kwargs):
+        if not self.promo_id:
+            last_promo = Promo.objects.order_by('-created_at').first()
+            if last_promo:
+                last_id = int(last_promo.promo_id[3:6])
+                new_id = f"pid{last_id + 1:03d}25"
+            else:
+                new_id = "pid00125"
+            self.promo_id = new_id
+
+        # Ensure end date is after start date
+        if self.promo_end_date <= self.promo_start_date:
+            self.promo_end_date = self.promo_start_date + timezone.timedelta(days=7)
+
+        super().save(*args, **kwargs)
+
+        # Update discounted prices for all linked products
+        for product in self.product_id.all():
+            product.update_discounted_price()
+
     class Meta:
         db_table = 'Promo'
-        
 
-# Signals to automatically update has_promo field on products
+
+# Signal handlers for Promo-Product relationship
 @receiver(post_save, sender=Promo)
-def update_product_has_promo_on_save(sender, instance, created, **kwargs):
-    """Update has_promo field when a promo is created or updated"""
-    update_products_has_promo_on_promo_save(instance)
+def update_product_prices_on_promo_save(sender, instance, created, **kwargs):
+    """Update product prices when a promo is created or updated"""
+    for product in instance.product_id.all():
+        product.update_discounted_price()
 
 @receiver(post_delete, sender=Promo)
-def update_product_has_promo_on_delete(sender, instance, **kwargs):
-    """Update has_promo field when a promo is deleted"""
-    update_products_has_promo_on_promo_delete(instance)
+def update_product_prices_on_promo_delete(sender, instance, **kwargs):
+    """Update product prices when a promo is deleted"""
+    for product in instance.product_id.all():
+        product.update_discounted_price()
 
-# Signal to handle many-to-many relationship changes
 @receiver(models.signals.m2m_changed, sender=Promo.product_id.through)
-def update_product_has_promo_on_m2m_change(sender, instance, action, pk_set, **kwargs):
-    """Update has_promo field when products are added/removed from a promo"""
+def update_product_prices_on_m2m_change(sender, instance, action, pk_set, **kwargs):
+    """Update product prices when products are added/removed from a promo"""
     if action in ["post_add", "post_remove", "post_clear"]:
-        update_products_has_promo_on_m2m_change(instance, action, pk_set)
+        # Update new products
+        if pk_set:
+            products = Product.objects.filter(pk__in=pk_set)
+            for product in products:
+                product.update_discounted_price()
+        
+        # For post_remove and post_clear, also update previously linked products
+        if action in ["post_remove", "post_clear"]:
+            for product in instance.product_id.all():
+                product.update_discounted_price()
 
 
 #CART

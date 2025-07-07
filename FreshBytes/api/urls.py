@@ -30,8 +30,10 @@ urlpatterns = [
     path("users/<str:pk>/", views.UserPostRetrieveUpdateDestroy.as_view(), name="user-detail"),
 
     # SELLERS 
-    path("sellers/", views.SellerPostListCreate.as_view(), name="sellers"),
-    path("sellers/<str:pk>/", views.SellerPostRetrieveUpdateDestroy.as_view(), name="seller-detail"),
+    path("sellers/", views.AllSellersPostListCreate.as_view(), name="seller-list-create"),
+    path("sellers/<str:pk>/", views.AllSellersPostRetrieveUpdateDestroy.as_view(), name="seller-detail"),
+    path("sellers/<str:seller_id>/products/", views.SellerProductsPostListCreate.as_view(), name="seller-products"),
+    path("sellers/<str:seller_id>/<str:product_id>/", views.SellerProductPostRetrieveUpdateDestroy.as_view(), name="seller-product-delete"),
 
     # REVIEWS
     path("reviews/", views.ReviewsPostListCreate.as_view(), name="reviews"),

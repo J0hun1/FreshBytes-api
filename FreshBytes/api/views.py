@@ -186,19 +186,49 @@ class UserPostRetrieveUpdateDestroy(generics.RetrieveUpdateDestroyAPIView):
 
 
 #SELLERS
-class SellerPostListCreate(generics.ListCreateAPIView):
+class AllSellersPostListCreate(generics.ListCreateAPIView):
     queryset = Seller.objects.all()
     serializer_class = SellerSerializer
     def delete(self, request, *args, **kwargs):
         #deletes all sellers
         Seller.objects.all().delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
 #allows to access, update, and delete individual sellers
-class SellerPostRetrieveUpdateDestroy(generics.RetrieveUpdateDestroyAPIView):
+class AllSellersPostRetrieveUpdateDestroy(generics.RetrieveUpdateDestroyAPIView):
     queryset = Seller.objects.all()
     serializer_class = SellerSerializer
     lookup_field = "pk"
 
+# Get products by seller  
+class SellerProductsPostListCreate(generics.ListCreateAPIView):
+    serializer_class = ProductSerializer
+
+    def get_queryset(self):
+        seller_id = self.kwargs['seller_id']
+        return Product.objects.filter(seller_id=seller_id, is_deleted=False)
+
+
+class SellerProductPostRetrieveUpdateDestroy(generics.RetrieveUpdateDestroyAPIView):
+    """
+    Delete a specific product belonging to a seller
+    """
+    serializer_class = ProductSerializer
+    lookup_field = 'product_id'
+
+    def get_queryset(self):
+        seller_id = self.kwargs['seller_id']
+        return Product.objects.filter(seller_id=seller_id)
+
+    def perform_destroy(self, instance):
+        # Verify the product belongs to the seller
+        if str(instance.seller_id.seller_id) != self.kwargs['seller_id']:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied("This product does not belong to the specified seller")
+        
+        # Soft delete instead of hard delete
+        instance.is_deleted = True
+        instance.save()
 
 #REVIEWS
 class ReviewsPostListCreate(generics.ListCreateAPIView):
@@ -214,7 +244,6 @@ class ReviewsPostRetrieveUpdateDestroy(generics.RetrieveUpdateDestroyAPIView):
     queryset = Reviews.objects.all()
     serializer_class = ReviewsSerializer
     lookup_field = "pk"
-
 
 
 #PROMO

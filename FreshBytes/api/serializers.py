@@ -32,7 +32,7 @@ class ProductSerializer(serializers.ModelSerializer):
     class Meta:
         model = Product
         fields = [
-            "product_id", "user_id", "seller_id", "product_name", "product_price", "product_brief_description", "product_full_description", "product_discountedPrice", "product_sku", "product_status", "product_location", "sub_category_id", "category_id", "quantity", "post_date", "harvest_date", "is_active", "review_count", "top_rated", "discounted_amount", "is_discounted", "is_srp", "is_deleted", "sell_count", "offer_start_date", "offer_end_date", "created_at", "updated_at", "has_promo"
+            "product_id", "user_id", "seller_id", "product_name", "product_price", "product_brief_description", "product_full_description", "product_discountedPrice", "product_sku", "product_status", "product_location", "sub_category_id", "category_id", "quantity", "post_date", "harvest_date", "is_active", "review_count", "top_rated", "discounted_amount", "is_discounted", "is_srp", "is_deleted", "sell_count", "created_at", "updated_at", "has_promo"
         ]
 
     def get_category_id(self, obj):
@@ -84,7 +84,7 @@ class UserSerializer(serializers.ModelSerializer):
 class SellerSerializer(serializers.ModelSerializer):
     class Meta:
         model = Seller
-        fields = ["seller_id", "user_id", "business_name", "business_email", "business_phone", "business_address", "total_earnings", "total_products", "total_orders", "total_reviews", "average_rating", "total_followers", "total_products_sold", "created_at", "updated_at", "is_active", "is_deleted"]
+        fields = ["seller_id", "user_id", "business_name", "business_email", "business_phone", "business_address", "total_earnings", "total_products", "total_orders", "total_reviews", "average_rating", "total_followers", "total_likes", "total_products_sold", "created_at", "updated_at", "is_active", "is_deleted"]
 
 class ReviewsSerializer(serializers.ModelSerializer):
     class Meta:
