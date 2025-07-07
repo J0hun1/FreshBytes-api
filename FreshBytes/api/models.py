@@ -208,7 +208,17 @@ class Product(models.Model):
     product_brief_description = models.CharField(max_length=255)
     product_full_description = models.CharField(max_length=255)
     product_discountedPrice = models.DecimalField(max_digits=10, decimal_places=2, null=True)
-    product_sku = models.CharField(max_length=255)
+    product_sku = models.CharField(max_length=255, unique=True, editable=False)
+
+    def save(self, *args, **kwargs):
+        if not self.product_sku:
+            # Generate SKU
+            prefix = self.product_name[:3].upper() if len(self.product_name) >= 3 else self.product_name.upper()
+            seller_products_count = Product.objects.filter(seller_id=self.seller_id).count() + 1
+            seller_id_suffix = self.seller_id.seller_id[-5:] if len(self.seller_id.seller_id) >= 5 else self.seller_id.seller_id
+            self.product_sku = f"{prefix}{seller_products_count:03d}{seller_id_suffix}"
+        
+        super().save(*args, **kwargs)
     product_status = models.CharField(max_length=20, choices=ProductStatus.choices, default=ProductStatus.FRESH)
     product_location = models.CharField(max_length=255, null=True)
     sub_category_id = models.ForeignKey(SubCategory, on_delete=models.CASCADE, null=True)
