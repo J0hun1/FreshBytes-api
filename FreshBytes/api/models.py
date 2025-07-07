@@ -169,39 +169,6 @@ class ProductStatus(models.TextChoices):
     
 class Product(models.Model):
     product_id = models.CharField(primary_key=True, max_length=10, unique=True, editable=False)
-
-    def save(self, *args, **kwargs):
-        if not self.product_id:
-            last_product = Product.objects.order_by('-created_at').first()
-            if last_product and last_product.product_id and len(last_product.product_id) >= 8:
-                try:
-                    last_id = int(last_product.product_id[4:7])  # Extract the numeric part after 'prod'
-                    new_id = f"prod{last_id + 1:03d}25"
-                except (ValueError, IndexError):
-                    new_id = "prod00125"
-            else:
-                new_id = "prod00125"
-            self.product_id = new_id
-        
-        # Set is_srp flag
-        if self.product_price > 0 and (self.product_discountedPrice is None or self.product_discountedPrice <= 0):
-            self.is_srp = True
-        
-        # Set is_discounted flag
-        if self.discounted_amount is not None and self.discounted_amount > 0:
-            self.is_discounted = True
-            
-        super().save(*args, **kwargs)
-        
-    @property
-    def user_id(self):
-        return self.seller_id.user_id.user_id if self.seller_id and self.seller_id.user_id else None
-
-    @property
-    def category_id(self):
-        """Get the category through the subcategory relationship"""
-        return self.sub_category_id.category_id if self.sub_category_id else None
-
     seller_id = models.ForeignKey(Seller, on_delete=models.CASCADE, null=True)
     product_name = models.CharField(max_length=255)
     product_price = models.DecimalField(max_digits=10, decimal_places=2, default=0)
@@ -230,23 +197,60 @@ class Product(models.Model):
     is_active = models.BooleanField(default=True)
     review_count = models.IntegerField(default=0)
     top_rated = models.BooleanField(default=False)
-    
+    is_srp = models.BooleanField(default=False)
+    is_discounted = models.BooleanField(default=False)
+    is_deleted = models.BooleanField(default=False)
+    sell_count = models.IntegerField(default=0)
+    offer_start_date = models.DateTimeField(null=True)
+    offer_end_date = models.DateTimeField(null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    @property
+    def user_id(self):
+        return self.seller_id.user_id.user_id if self.seller_id and self.seller_id.user_id else None
+
+    @property
+    def category_id(self):
+        """Get the category through the subcategory relationship"""
+        return self.sub_category_id.category_id if self.sub_category_id else None
 
     @property
     def discounted_amount(self):
         if self.product_discountedPrice is not None:
             return self.product_price - self.product_discountedPrice
         return None
-    
-    is_srp = models.BooleanField(default=False)
-    is_discounted = models.BooleanField(default=False)
-    is_deleted = models.BooleanField(default=False)
-    
-    sell_count = models.IntegerField(default=0)
-    offer_start_date = models.DateTimeField(null=True)
-    offer_end_date = models.DateTimeField(null=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+
+    def save(self, *args, **kwargs):
+        # Generate product_id if not exists
+        if not self.product_id:
+            last_product = Product.objects.order_by('-created_at').first()
+            if last_product and last_product.product_id and len(last_product.product_id) >= 8:
+                try:
+                    last_id = int(last_product.product_id[4:7])  # Extract the numeric part after 'prod'
+                    new_id = f"prod{last_id + 1:03d}25"
+                except (ValueError, IndexError):
+                    new_id = "prod00125"
+            else:
+                new_id = "prod00125"
+            self.product_id = new_id
+        
+        # Generate SKU if not exists
+        if not self.product_sku:
+            prefix = self.product_name[:3].upper() if len(self.product_name) >= 3 else self.product_name.upper()
+            seller_products_count = Product.objects.filter(seller_id=self.seller_id).count() + 1
+            seller_id_suffix = self.seller_id.seller_id[-5:] if self.seller_id and len(self.seller_id.seller_id) >= 5 else "00000"
+            self.product_sku = f"{prefix}{seller_products_count:03d}{seller_id_suffix}"
+        
+        # Set is_srp flag
+        if self.product_price > 0 and (self.product_discountedPrice is None or self.product_discountedPrice <= 0):
+            self.is_srp = True
+        
+        # Set is_discounted flag
+        if self.discounted_amount is not None and self.discounted_amount > 0:
+            self.is_discounted = True
+            
+        super().save(*args, **kwargs)
 
     class Meta:
         db_table = 'Products'
