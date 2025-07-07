@@ -191,16 +191,41 @@ class Category(models.Model):
 class SubCategory(models.Model):
     sub_category_id = models.CharField(primary_key=True, max_length=10, unique=True, editable=False)
 
+    def generate_sub_category_id(self, category_prefix, counter=0):
+        """Generate a unique subcategory ID with optional counter for conflict resolution"""
+        base_id = f"subid{category_prefix}{counter:03d}25"
+        if not SubCategory.objects.filter(sub_category_id=base_id).exists():
+            return base_id
+        if counter > 999:
+            raise ValueError("Unable to generate unique subcategory ID after 999 attempts")
+        return self.generate_sub_category_id(category_prefix, counter + 1)
+
     def save(self, *args, **kwargs):
         if not self.sub_category_id:
-            last_sub_category = SubCategory.objects.order_by('-created_at').first()
+            # Get the category ID prefix
+            category_prefix = str(self.category_id.category_id) if self.category_id else "0"
+            
+            # Find the starting counter for this category
+            last_sub_category = SubCategory.objects.filter(
+                category_id=self.category_id
+            ).order_by('-created_at').first()
+
+            starting_counter = 1
             if last_sub_category:
-                last_id = int(last_sub_category.sub_category_id[5:8])  # Extract the numeric part after 'subid'
-                new_id = f"subid{last_id + 1:03d}25"
-            else:
-                new_id = "subid00125"
-            self.sub_category_id = new_id
+                try:
+                    # Try to extract the counter from the last ID
+                    id_parts = last_sub_category.sub_category_id.split(category_prefix)
+                    if len(id_parts) > 1:
+                        num_part = id_parts[1][0:3]  # Get the numeric part
+                        starting_counter = int(num_part) + 1
+                except (ValueError, IndexError):
+                    starting_counter = 1
+
+            # Generate unique ID
+            self.sub_category_id = self.generate_sub_category_id(category_prefix, starting_counter)
+
         super().save(*args, **kwargs)
+
     category_id = models.ForeignKey(Category, on_delete=models.CASCADE, null=True)
     sub_category_name = models.CharField(max_length=255, default="", unique=True)
     sub_category_description = models.CharField(max_length=255)
@@ -208,7 +233,6 @@ class SubCategory(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
-
 #PRODUCT 
 class ProductStatus(models.TextChoices):
     ROTTEN = 'ROTTEN', 'Rotten'
