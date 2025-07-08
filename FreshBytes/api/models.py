@@ -37,16 +37,16 @@ class UserManager(BaseUserManager):
 
 class User(AbstractBaseUser, PermissionsMixin):
     ROLE_CHOICES = [
-        ('admin', 'Admin'),  # Has full access to both Django admin and application features
-        ('seller', 'Seller'),  # Can manage their products and sales
-        ('customer', 'Customer'),  # Can make purchases and write reviews
+        ('admin', 'Admin'),
+        ('seller', 'Seller'),
+        ('customer', 'Customer'),
     ]
 
     user_id = models.CharField(primary_key=True, max_length=10, unique=True, editable=False)
     user_name = models.CharField(max_length=255)
     first_name = models.CharField(max_length=255)
     last_name = models.CharField(max_length=255)
-    user_email = models.EmailField(unique=True, null=True)  # Keep nullable for regular users
+    user_email = models.EmailField(unique=True, null=True)
     password = models.CharField(max_length=128, null=True)
     user_phone = models.CharField(max_length=255)
     user_address = models.CharField(max_length=255)
@@ -54,10 +54,9 @@ class User(AbstractBaseUser, PermissionsMixin):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
-    # Django's built-in permission flags
-    is_active = models.BooleanField(default=True)  # Can login
-    is_staff = models.BooleanField(default=False)  # Can access Django admin
-    is_superuser = models.BooleanField(default=False)  # Has all permissions
+    is_active = models.BooleanField(default=True)
+    is_staff = models.BooleanField(default=False)
+    is_superuser = models.BooleanField(default=False)
     is_deleted = models.BooleanField(default=False)
 
     objects = UserManager()
@@ -65,39 +64,18 @@ class User(AbstractBaseUser, PermissionsMixin):
     USERNAME_FIELD = 'user_email'
     REQUIRED_FIELDS = ['user_name', 'first_name', 'last_name']
 
-    def clean(self):
-        """Validate that sellers must have an email"""
-        if self.role == 'seller' and not self.user_email:
-            from django.core.exceptions import ValidationError
-            raise ValidationError('Sellers must have an email address')
-        super().clean()
-
     def save(self, *args, **kwargs):
-        self.clean()  # Run validation before saving
-        if not self.user_id:
-            current_year = timezone.now().year % 100
-            last_user = User.objects.order_by('-created_at').first()
-            if last_user:
-                last_id = int(last_user.user_id[3:6])
-                new_id = f"uid{last_id + 1:03d}{current_year:02d}"
-            else:
-                new_id = f"uid00125"
-            self.user_id = new_id
-
-        # Ensure Django admin access for admin role
-        if self.role == 'admin':
-            self.is_staff = True
-            self.is_superuser = True
+        from .services.users_services import generate_user_id, validate_user_role
         
-        super().save(*args, **kwargs)
+        if not self.user_id:
+            last_user = User.objects.order_by('-created_at').first()
+            self.user_id = generate_user_id(last_user)
 
-    def __str__(self):
-        """Return the user_id as the string representation"""
-        return self.user_id
+        self = validate_user_role(self)
+        super().save(*args, **kwargs)
 
     @property
     def is_admin(self):
-        """Property to maintain compatibility - returns True if role is admin"""
         return self.role == 'admin'
 
     class Meta:
@@ -108,17 +86,6 @@ class User(AbstractBaseUser, PermissionsMixin):
 #SELLER
 class Seller(models.Model):
     seller_id = models.CharField(primary_key=True, max_length=10, unique=True, editable=False)
-
-    def save(self, *args, **kwargs):
-        if not self.seller_id:
-            last_seller = Seller.objects.order_by('-created_at').first()
-            if last_seller:
-                last_id = int(last_seller.seller_id[3:6])  # Extract the numeric part after 'sid'
-                new_id = f"sid{last_id + 1:03d}25"
-            else:
-                new_id = "sid00125"
-            self.seller_id = new_id
-        super().save(*args, **kwargs)
     user_id = models.ForeignKey(User, on_delete=models.CASCADE, null=True)
     business_name = models.CharField(default="", max_length=255)
     business_email = models.EmailField(blank=True)
@@ -138,35 +105,19 @@ class Seller(models.Model):
     is_deleted = models.BooleanField(default=False)
 
     def clean(self):
-        """Validate seller data before saving"""
-        from django.core.exceptions import ValidationError
-        if not self.user_id:
-            raise ValidationError('A seller must be associated with a user')
-        if not self.user_id.user_email:
-            raise ValidationError('The associated user must have an email address')
+        from .services.seller_services import validate_seller
+        validate_seller(self)
         
     def save(self, *args, **kwargs):
+        from .services.seller_services import generate_seller_id, initialize_seller_stats
+        
         if not self.seller_id:
             last_seller = Seller.objects.order_by('-created_at').first()
-            if last_seller:
-                last_id = int(last_seller.seller_id[3:6])  # Extract the numeric part after 'sid'
-                new_id = f"sid{last_id + 1:03d}25"
-            else:
-                new_id = "sid00125"
-            self.seller_id = new_id
+            self.seller_id = generate_seller_id(last_seller)
 
-        # Ensure numeric fields are not null
-        self.total_products = self.total_products or 0
-        self.total_orders = self.total_orders or 0
-        self.total_reviews = self.total_reviews or 0
-        self.average_rating = self.average_rating or 0
-        self.total_followers = self.total_followers or 0
-        self.total_likes = self.total_likes or 0
-        self.total_products_sold = self.total_products_sold or 0
-
-        self.clean()  # Run validation
+        initialize_seller_stats(self)
+        self.clean()
         
-        # If business_email is blank, use user's email
         if not self.business_email and self.user_id and self.user_id.user_email:
             self.business_email = self.user_id.user_email
             
@@ -191,48 +142,26 @@ class Category(models.Model):
 #SUBCATEGORY
 class SubCategory(models.Model):
     sub_category_id = models.CharField(primary_key=True, max_length=10, unique=True, editable=False)
-
-    def generate_sub_category_id(self, category_prefix, counter=0):
-        """Generate a unique subcategory ID with optional counter for conflict resolution"""
-        base_id = f"subid{category_prefix}{counter:03d}25"
-        if not SubCategory.objects.filter(sub_category_id=base_id).exists():
-            return base_id
-        if counter > 999:
-            raise ValueError("Unable to generate unique subcategory ID after 999 attempts")
-        return self.generate_sub_category_id(category_prefix, counter + 1)
-
-    def save(self, *args, **kwargs):
-        if not self.sub_category_id:
-            # Get the category ID prefix
-            category_prefix = str(self.category_id.category_id) if self.category_id else "0"
-            
-            # Find the starting counter for this category
-            last_sub_category = SubCategory.objects.filter(
-                category_id=self.category_id
-            ).order_by('-created_at').first()
-
-            starting_counter = 1
-            if last_sub_category:
-                try:
-                    # Try to extract the counter from the last ID
-                    id_parts = last_sub_category.sub_category_id.split(category_prefix)
-                    if len(id_parts) > 1:
-                        num_part = id_parts[1][0:3]  # Get the numeric part
-                        starting_counter = int(num_part) + 1
-                except (ValueError, IndexError):
-                    starting_counter = 1
-
-            # Generate unique ID
-            self.sub_category_id = self.generate_sub_category_id(category_prefix, starting_counter)
-
-        super().save(*args, **kwargs)
-
     category_id = models.ForeignKey(Category, on_delete=models.CASCADE, null=True)
     sub_category_name = models.CharField(max_length=255, default="", unique=True)
     sub_category_description = models.CharField(max_length=255)
     sub_category_image = models.ImageField(upload_to='sub_category_images/', blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    def save(self, *args, **kwargs):
+        from .services.category_services import generate_subcategory_id, get_starting_counter
+        
+        if not self.sub_category_id:
+            category_prefix = str(self.category_id.category_id) if self.category_id else "0"
+            last_sub_category = SubCategory.objects.filter(
+                category_id=self.category_id
+            ).order_by('-created_at').first()
+            
+            starting_counter = get_starting_counter(category_prefix, last_sub_category)
+            self.sub_category_id = generate_subcategory_id(category_prefix, starting_counter)
+            
+        super().save(*args, **kwargs)
     
 #PRODUCT 
 class ProductStatus(models.TextChoices):
@@ -273,7 +202,6 @@ class Product(models.Model):
 
     @property
     def category_id(self):
-        """Get the category through the subcategory relationship"""
         return self.sub_category_id.category_id if self.sub_category_id else None
 
     @property
@@ -283,70 +211,27 @@ class Product(models.Model):
         return None
 
     def update_discounted_price(self):
-        """Update discounted price based on active promos"""
-        active_promos = self.promos.filter(
-            is_active=True,
-            promo_start_date__lte=timezone.now(),
-            promo_end_date__gte=timezone.now()
-        ).order_by('-discount_amount', '-discount_percentage')
-
-        if not active_promos.exists():
-            self.product_discountedPrice = None
-            self.is_discounted = False
-            self.has_promo = False
-            self.save()
-            return
-
-        # Get the promo with the highest discount
-        best_promo = active_promos.first()
-        
-        if best_promo.discount_type == Discount_Type.PERCENTAGE:
-            discount = (self.product_price * best_promo.discount_percentage) / 100
-        else:  # FIXED amount
-            discount = best_promo.discount_amount
-
-        self.product_discountedPrice = max(0, self.product_price - discount)
-        self.is_discounted = True
-        self.has_promo = True
-        self.save()
-
-    def generate_sku(self, counter=0):
-        """Generate a unique SKU with optional counter for conflict resolution"""
-        prefix = self.product_name[:3].upper() if len(self.product_name) >= 3 else self.product_name.upper()
-        seller_products_count = Product.objects.filter(seller_id=self.seller_id).count() + 1
-        seller_id_suffix = self.seller_id.seller_id[-5:] if self.seller_id and len(self.seller_id.seller_id) >= 5 else "00000"
-        
-        # Add counter to SKU if there's a conflict
-        if counter > 0:
-            return f"{prefix}{seller_products_count:03d}{seller_id_suffix}_{counter}"
-        return f"{prefix}{seller_products_count:03d}{seller_id_suffix}"
+        from .services.product_services import update_product_discounted_price
+        update_product_discounted_price(self)
 
     def save(self, *args, **kwargs):
+        from .services.product_services import generate_product_id, generate_product_sku
+        
         if not self.product_id:
             last_product = Product.objects.order_by('-created_at').first()
-            if last_product and last_product.product_id and len(last_product.product_id) >= 8:
-                try:
-                    last_id = int(last_product.product_id[4:7])
-                    new_id = f"prod{last_id + 1:03d}25"
-                except (ValueError, IndexError):
-                    new_id = "prod00125"
-            else:
-                new_id = "prod00125"
-            self.product_id = new_id
+            self.product_id = generate_product_id(last_product)
 
-        # Generate unique SKU
         if not self.product_sku:
             counter = 0
             while True:
                 try:
-                    self.product_sku = self.generate_sku(counter)
-                    # Try saving to check for conflicts
+                    seller_products_count = Product.objects.filter(seller_id=self.seller_id).count() + 1
+                    self.product_sku = generate_product_sku(self, seller_products_count, counter)
                     if not Product.objects.filter(product_sku=self.product_sku).exists():
                         break
                     counter += 1
                 except Exception:
                     counter += 1
-                # Prevent infinite loop
                 if counter > 1000:
                     raise ValueError("Unable to generate unique SKU after 1000 attempts")
 
@@ -375,18 +260,6 @@ def update_seller_product_count_on_delete(sender, instance, **kwargs):
 #REVIEWS
 class Reviews(models.Model):
     review_id = models.CharField(primary_key=True, max_length=10, unique=True, editable=False)
-
-    def save(self, *args, **kwargs):
-        if not self.review_id:
-            current_year = timezone.now().year % 100  # Get last two digits of the current year
-            last_review = Reviews.objects.order_by('-created_at').first()
-            if last_review:
-                last_id = int(last_review.review_id[3:6])  # Extract the numeric part after 'rid'
-                new_id = f"rid{last_id + 1:03d}{current_year:02d}"
-            else:
-                new_id = f"rid001{current_year:02d}"
-            self.review_id = new_id
-        super().save(*args, **kwargs)
     user_id = models.ForeignKey(User, on_delete=models.CASCADE, null=True)
     product_id = models.ForeignKey(Product, on_delete=models.CASCADE, null=True)
     review_rating = models.IntegerField(default=0)
@@ -394,6 +267,21 @@ class Reviews(models.Model):
     review_date = models.DateTimeField(auto_now_add=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    
+    def save(self, *args, **kwargs):
+        from .services.review_services import generate_review_id, update_product_review_stats, update_seller_review_stats
+        
+        if not self.review_id:
+            last_review = Reviews.objects.order_by('-created_at').first()
+            self.review_id = generate_review_id(last_review)
+            
+        super().save(*args, **kwargs)
+        
+        # Update related statistics
+        if self.product_id:
+            update_product_review_stats(self.product_id)
+            if self.product_id.seller_id:
+                update_seller_review_stats(self.product_id.seller_id)
     
     class Meta:
         db_table = 'Reviews'
@@ -404,10 +292,20 @@ class Discount_Type(models.TextChoices):
     PERCENTAGE = 'PERCENTAGE', 'Percentage'
     FIXED = 'FIXED', 'Fixed'
 
+class PromoProduct(models.Model):
+    """Intermediate model for Promo-Product relationship"""
+    promo = models.ForeignKey('Promo', on_delete=models.CASCADE)
+    product = models.ForeignKey('Product', on_delete=models.CASCADE)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'PromoProduct'
+        unique_together = ('promo', 'product')
+
 class Promo(models.Model):
     promo_id = models.CharField(primary_key=True, max_length=10, unique=True, editable=False)
     seller_id = models.ForeignKey(Seller, on_delete=models.CASCADE, default=None)
-    product_id = models.ManyToManyField(Product, related_name='promos')
+    product_id = models.ManyToManyField(Product, through='PromoProduct', related_name='promos')
     promo_description = models.CharField(max_length=255, default="")
     promo_name = models.CharField(max_length=255)
     discount_type = models.CharField(max_length=255, choices=Discount_Type.choices, default=Discount_Type.FIXED)
@@ -420,6 +318,8 @@ class Promo(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     def save(self, *args, **kwargs):
+        from .services.promo_services import update_products_has_promo_on_promo_save
+        
         if not self.promo_id:
             last_promo = Promo.objects.order_by('-created_at').first()
             if last_promo:
@@ -433,43 +333,35 @@ class Promo(models.Model):
         if self.promo_end_date <= self.promo_start_date:
             self.promo_end_date = self.promo_start_date + timezone.timedelta(days=7)
 
+        # First save the promo
         super().save(*args, **kwargs)
-
-        # Update discounted prices for all linked products
-        for product in self.product_id.all():
-            product.update_discounted_price()
+        
+        # Then update all associated products
+        if self.pk:  # Only if promo exists in database
+            update_products_has_promo_on_promo_save(self)
 
     class Meta:
         db_table = 'Promo'
 
 
 # Signal handlers for Promo-Product relationship
-@receiver(post_save, sender=Promo)
-def update_product_prices_on_promo_save(sender, instance, created, **kwargs):
-    """Update product prices when a promo is created or updated"""
-    for product in instance.product_id.all():
-        product.update_discounted_price()
-
-@receiver(post_delete, sender=Promo)
-def update_product_prices_on_promo_delete(sender, instance, **kwargs):
-    """Update product prices when a promo is deleted"""
-    for product in instance.product_id.all():
-        product.update_discounted_price()
+@receiver([post_save, post_delete], sender=Promo)
+def handle_promo_changes(sender, instance, **kwargs):
+    """Handle both creation and deletion of promos"""
+    from .services.promo_services import update_products_has_promo_on_promo_save, update_products_has_promo_on_promo_delete
+    
+    if kwargs.get('created', False) or not kwargs.get('raw', False):
+        update_products_has_promo_on_promo_save(instance)
+    elif kwargs.get('signal') == post_delete:
+        update_products_has_promo_on_promo_delete(instance)
 
 @receiver(models.signals.m2m_changed, sender=Promo.product_id.through)
-def update_product_prices_on_m2m_change(sender, instance, action, pk_set, **kwargs):
-    """Update product prices when products are added/removed from a promo"""
-    if action in ["post_add", "post_remove", "post_clear"]:
-        # Update new products
-        if pk_set:
-            products = Product.objects.filter(pk__in=pk_set)
-            for product in products:
-                product.update_discounted_price()
-        
-        # For post_remove and post_clear, also update previously linked products
-        if action in ["post_remove", "post_clear"]:
-            for product in instance.product_id.all():
-                product.update_discounted_price()
+def handle_promo_m2m_changes(sender, instance, action, pk_set, **kwargs):
+    """Handle changes to promo-product relationships"""
+    from .services.promo_services import update_products_has_promo_on_m2m_change
+    
+    if action.startswith("post_"):  # post_add, post_remove, post_clear
+        update_products_has_promo_on_m2m_change(instance, action, pk_set)
 
 
 #CART
@@ -504,22 +396,14 @@ class CartItem(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     def save(self, *args, **kwargs):
+        from .services.cart_services import generate_cart_item_id, calculate_cart_item_total
+        
         if not self.cart_item_id:
             last_cart_item = CartItem.objects.order_by('-created_at').first()
-            if last_cart_item and last_cart_item.cart_item_id and len(last_cart_item.cart_item_id) >= 8:
-                try:
-                    last_id = int(last_cart_item.cart_item_id[5:8])  # Extract the numeric part after 'citid'
-                    new_id = f"citid{last_id + 1:03d}25"
-                except (ValueError, IndexError):
-                    new_id = "citid00125"
-            else:
-                new_id = "citid00125"
-            self.cart_item_id = new_id
+            self.cart_item_id = generate_cart_item_id(last_cart_item)
         
-        # Calculate total_price before saving
         if self.product_id:
-            product_price = self.product_id.product_discountedPrice if self.product_id.is_discounted else self.product_id.product_price
-            self.total_item_price = product_price * self.quantity
+            self.total_item_price = calculate_cart_item_total(self.product_id, self.quantity)
         
         super().save(*args, **kwargs)
 
@@ -571,31 +455,19 @@ class OrderItem(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     
     def save(self, *args, **kwargs):
+        from .services.order_services import generate_order_item_id, calculate_order_item_total
+        
         if not self.order_item_id:
             last_order_item = OrderItem.objects.order_by('-created_at').first()
-            if last_order_item and last_order_item.order_item_id and len(last_order_item.order_item_id) >= 8:
-                try:
-                    last_id = int(last_order_item.order_item_id[5:8])  # Extract the numeric part after 'oitid'
-                    new_id = f"oitid{last_id + 1:03d}25"
-                except (ValueError, IndexError):
-                    new_id = "oitid00125"
-            else:
-                new_id = "oitid00125"
-            self.order_item_id = new_id
+            self.order_item_id = generate_order_item_id(last_order_item)
         
-        # Calculate total_item_price before saving
         if self.product_id:
-            product_price = self.product_id.product_discountedPrice if self.product_id.is_discounted else self.product_id.product_price
-            self.total_item_price = product_price * self.quantity
+            self.total_item_price = calculate_order_item_total(self.product_id, self.quantity)
         
         super().save(*args, **kwargs)
     
     class Meta:
         db_table = 'OrderItems'
-
-
-#ORDER STATUS
-
 
 
 #PAYMENT
