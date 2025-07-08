@@ -5,7 +5,8 @@ from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
 from django.contrib.auth.hashers import make_password
-from .services import update_seller_total_products, update_products_has_promo_on_promo_save, update_products_has_promo_on_promo_delete, update_products_has_promo_on_m2m_change
+from .services.product_services import update_seller_total_products
+from .services.promo_services import update_products_has_promo_on_promo_save, update_products_has_promo_on_promo_delete, update_products_has_promo_on_m2m_change
 
 class UserManager(BaseUserManager):
     def create_user(self, user_email, password=None, **extra_fields):
