@@ -10,9 +10,6 @@ urlpatterns = [
     path("auth/logout/", views.LogoutView.as_view(), name="auth_logout"),
     path("auth/test/", views.TestAuthView.as_view(), name="test_auth"),
 
-    # ALL DATA - Get all data from all models in one endpoint
-    path("", views.AllDataView.as_view(), name="all-data"),
-
     # PRODUCTS 
     path("products/", views.ProductPostListCreate.as_view(), name="products"),
     path("products/<str:pk>/", views.ProductPostRetrieveUpdateDestroy.as_view(), name="product-detail"),

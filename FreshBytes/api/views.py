@@ -50,55 +50,6 @@ class LogoutView(APIView):
         except Exception:
             return Response({"error": "Invalid token."}, status=status.HTTP_400_BAD_REQUEST)
 
-# Create your views here.
-
-# ALL DATA VIEW - Returns all data from all models
-class AllDataView(APIView):
-    permission_classes = [IsAuthenticated, IsAdmin]  # Only admins can access all data
-    def get(self, request):
-        """Get all data from all models in a single response"""
-        try:
-            # Get all data from each model
-            products = Product.objects.all()
-            categories = Category.objects.all()
-            users = User.objects.all()
-            sellers = Seller.objects.all()
-            subcategories = SubCategory.objects.all()
-            reviews = Reviews.objects.all()
-            
-            # Serialize the data
-            product_data = ProductSerializer(products, many=True).data
-            category_data = CategorySerializer(categories, many=True).data
-            user_data = UserSerializer(users, many=True).data
-            seller_data = SellerSerializer(sellers, many=True).data
-            subcategory_data = SubCategorySerializer(subcategories, many=True).data
-            review_data = ReviewsSerializer(reviews, many=True).data
-            
-            # Combine all data into a single response
-            all_data = {
-                'products': product_data,
-                'categories': category_data,
-                'users': user_data,
-                'sellers': seller_data,
-                'subcategories': subcategory_data,
-                'reviews': review_data,
-                'summary': {
-                    'total_products': products.count(),
-                    'total_categories': categories.count(),
-                    'total_users': users.count(),
-                    'total_sellers': sellers.count(),
-                    'total_subcategories': subcategories.count(),
-                    'total_reviews': reviews.count(),
-                }
-            }
-            
-            return Response(all_data, status=status.HTTP_200_OK)
-            
-        except Exception as e:
-            return Response(
-                {'error': f'An error occurred while fetching data: {str(e)}'}, 
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
 
 #PRODUCTS
 class ProductPostListCreate(generics.ListCreateAPIView):

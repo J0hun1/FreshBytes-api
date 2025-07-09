@@ -84,8 +84,8 @@ class User(AbstractBaseUser, PermissionsMixin):
 
 #SELLER
 class Seller(models.Model):
-    seller_id = models.CharField(primary_key=True, max_length=10, unique=True, editable=False)
-    user_id = models.ForeignKey(User, on_delete=models.CASCADE, null=True, db_column='user_id')
+    seller_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False, unique=True)
+    user_id = models.OneToOneField(User, on_delete=models.CASCADE, related_name='seller_profile', db_column='user_id', null=True, blank=True)
     business_name = models.CharField(default="", max_length=255)
     business_email = models.EmailField(blank=True)
     business_phone = models.IntegerField(default="")
@@ -108,12 +108,8 @@ class Seller(models.Model):
         validate_seller(self)
         
     def save(self, *args, **kwargs):
-        from .services.seller_services import generate_seller_id, initialize_seller_stats
+        from .services.seller_services import initialize_seller_stats
         
-        if not self.seller_id:
-            last_seller = Seller.objects.order_by('-created_at').first()
-            self.seller_id = generate_seller_id(last_seller)
-
         initialize_seller_stats(self)
         self.clean()
         
