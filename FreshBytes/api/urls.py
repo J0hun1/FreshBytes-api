@@ -26,11 +26,12 @@ urlpatterns = [
     path("subcategories/<str:pk>/", views.SubCategoryPostRetrieveUpdateDestroy.as_view(), name="subcategory-detail"),
 
     # USERS 
-    path("users/", views.UserPostListCreate.as_view(), name="users"),
-    path("users/<str:pk>/", views.UserPostRetrieveUpdateDestroy.as_view(), name="user-detail"),
-    # Deleted users endpoints
+    # Deleted users endpoints must come first to avoid catching 'deleted' as pk
     path("users/deleted/", views.DeletedUsersListDelete.as_view(), name="deleted-users"),
     path("users/deleted/<uuid:pk>/", views.DeletedUserRetrieveDestroy.as_view(), name="deleted-user-detail"),
+    # Regular users endpoints
+    path("users/", views.UserPostListCreate.as_view(), name="users"),
+    path("users/<uuid:pk>/", views.UserPostRetrieveUpdateDestroy.as_view(), name="user-detail"),
 
     # SELLERS 
     path("sellers/", views.AllSellersPostListCreate.as_view(), name="seller-list-create"),

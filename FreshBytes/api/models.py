@@ -85,7 +85,7 @@ class User(AbstractBaseUser, PermissionsMixin):
 #SELLER
 class Seller(models.Model):
     seller_id = models.CharField(primary_key=True, max_length=10, unique=True, editable=False)
-    user_id = models.ForeignKey(User, on_delete=models.CASCADE, null=True)
+    user_id = models.ForeignKey(User, on_delete=models.CASCADE, null=True, db_column='user_id')
     business_name = models.CharField(default="", max_length=255)
     business_email = models.EmailField(blank=True)
     business_phone = models.IntegerField(default="")
@@ -274,7 +274,7 @@ def update_seller_product_count_on_delete(sender, instance, **kwargs):
 #REVIEWS
 class Reviews(models.Model):
     review_id = models.CharField(primary_key=True, max_length=10, unique=True, editable=False)
-    user_id = models.ForeignKey(User, on_delete=models.CASCADE, null=True)
+    user_id = models.ForeignKey(User, on_delete=models.CASCADE, null=True, db_column='user_id')
     product_id = models.ForeignKey(Product, on_delete=models.CASCADE, null=True)
     review_rating = models.IntegerField(default=0)
     review_comment = models.CharField(max_length=255)
@@ -410,7 +410,7 @@ class Cart(models.Model):
             self.cart_id = new_id
         super().save(*args, **kwargs)
         
-    user_id = models.OneToOneField(User, on_delete=models.CASCADE, null=True)
+    user_id = models.OneToOneField(User, on_delete=models.CASCADE, null=True, db_column='user_id')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -453,7 +453,7 @@ class Order(models.Model):
                 new_id = "oid00125"
             self.order_id = new_id
         super().save(*args, **kwargs)
-    user_id = models.ForeignKey(User, on_delete=models.CASCADE, null=True)
+    user_id = models.ForeignKey(User, on_delete=models.CASCADE, null=True, db_column='user_id')
     order_date = models.DateTimeField(auto_now_add=True)
     order_total = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     discount_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
