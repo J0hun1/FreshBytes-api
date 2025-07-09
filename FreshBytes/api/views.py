@@ -13,6 +13,7 @@ from .serializers import (
     SubCategorySerializer, ReviewsSerializer, PromoSerializer, CartSerializer, 
     CartItemSerializer, OrderSerializer, OrderItemSerializer, CustomTokenObtainPairSerializer
 )
+from rest_framework import serializers
 
 # Custom permission classes
 class IsAdmin(BasePermission):
@@ -183,6 +184,12 @@ class UserPostRetrieveUpdateDestroy(generics.RetrieveUpdateDestroyAPIView):
         if user.role == 'admin':
             return User.objects.all()
         return User.objects.filter(user_id=user.user_id)
+        
+    def perform_destroy(self, instance):
+        """Soft delete the user instead of hard delete"""
+        instance.is_deleted = True
+        instance.is_active = False
+        instance.save()
 
 
 #SELLERS
@@ -226,9 +233,9 @@ class SellerProductPostRetrieveUpdateDestroy(generics.RetrieveUpdateDestroyAPIVi
             from rest_framework.exceptions import PermissionDenied
             raise PermissionDenied("This product does not belong to the specified seller")
         
-        # Soft delete instead of hard delete
+        # Soft delete using update_fields to prevent recursion
         instance.is_deleted = True
-        instance.save()
+        instance.save(update_fields=['is_deleted'])
 
 #REVIEWS
 class ReviewsPostListCreate(generics.ListCreateAPIView):
@@ -250,16 +257,170 @@ class ReviewsPostRetrieveUpdateDestroy(generics.RetrieveUpdateDestroyAPIView):
 class PromoPostListCreate(generics.ListCreateAPIView):
     queryset = Promo.objects.all()
     serializer_class = PromoSerializer
+    permission_classes = [IsAuthenticated, IsSeller]  # Only sellers can create promos
+
+    def perform_create(self, serializer):
+        """Handle the creation of a new promo with products"""
+        # Get the seller associated with the user
+        try:
+            seller = Seller.objects.get(user_id=self.request.user)
+        except Seller.DoesNotExist:
+            raise serializers.ValidationError({
+                "error": "Only sellers can create promos. No seller profile found for this user."
+            })
+
+        # Save the promo with the seller
+        promo = serializer.save(seller_id=seller)
+        
+        # Get the products from the request data
+        product_ids = self.request.data.get('product_id', [])
+        if isinstance(product_ids, str):
+            # If a single ID was provided, convert it to a list
+            product_ids = [product_ids]
+        
+        # Validate that the products belong to this seller
+        if product_ids:
+            products = Product.objects.filter(
+                product_id__in=product_ids,
+                seller_id=seller
+            )
+            
+            # Check if all requested products were found and belong to the seller
+            found_ids = set(str(p.product_id) for p in products)
+            requested_ids = set(product_ids)
+            invalid_ids = requested_ids - found_ids
+            
+            if invalid_ids:
+                raise serializers.ValidationError({
+                    "error": f"Products with IDs {invalid_ids} either don't exist or don't belong to this seller."
+                })
+            
+            # Add the products to the promo
+            promo.product_id.set(products)
+
+    def get_queryset(self):
+        """Filter promos based on user role"""
+        user = self.request.user
+        if user.role == 'seller':
+            # Sellers can only see their own promos
+            return Promo.objects.filter(seller_id__user_id=user)
+        elif user.role == 'admin':
+            # Admins can see all promos
+            return Promo.objects.all()
+        else:
+            # Customers can see all active promos
+            return Promo.objects.filter(is_active=True)
 
     def delete(self, request, *args, **kwargs):
-        #deletes all promos
-        Promo.objects.all().delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
+        """Only allow sellers to delete their own promos or admins to delete any promo"""
+        if request.user.role == 'admin':
+            Promo.objects.all().delete()
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        elif request.user.role == 'seller':
+            Promo.objects.filter(seller_id__user_id=request.user).delete()
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        else:
+            return Response(
+                {"error": "Only sellers can delete their own promos or admins can delete all promos."},
+                status=status.HTTP_403_FORBIDDEN
+            )
 
 class PromoPostRetrieveUpdateDestroy(generics.RetrieveUpdateDestroyAPIView):
     queryset = Promo.objects.all()
     serializer_class = PromoSerializer
+    permission_classes = [IsAuthenticated]
     lookup_field = "pk"
+
+    def get_queryset(self):
+        """Filter promos based on user role"""
+        user = self.request.user
+        if user.role == 'seller':
+            # Sellers can only see their own promos
+            return Promo.objects.filter(seller_id__user_id=user)
+        elif user.role == 'admin':
+            # Admins can see all promos
+            return Promo.objects.all()
+        else:
+            # Customers can see all active promos
+            return Promo.objects.filter(is_active=True)
+
+    def perform_update(self, serializer):
+        """Handle updating a promo's products"""
+        # Get the current promo
+        promo = self.get_object()
+        
+        # Only allow sellers to update their own promos (admins can update any)
+        if self.request.user.role == 'seller' and promo.seller_id.user_id != self.request.user:
+            raise serializers.ValidationError({
+                "error": "You can only update your own promos."
+            })
+        
+        # Save the promo first
+        promo = serializer.save()
+        
+        # Get the products from the request data
+        product_ids = self.request.data.get('product_id', None)
+        if product_ids is not None:
+            if isinstance(product_ids, str):
+                # If a single ID was provided, convert it to a list
+                product_ids = [product_ids]
+            
+            # For sellers, validate that the products belong to them
+            if self.request.user.role == 'seller':
+                products = Product.objects.filter(
+                    product_id__in=product_ids,
+                    seller_id__user_id=self.request.user
+                )
+                
+                # Check if all requested products were found and belong to the seller
+                found_ids = set(str(p.product_id) for p in products)
+                requested_ids = set(product_ids)
+                invalid_ids = requested_ids - found_ids
+                
+                if invalid_ids:
+                    raise serializers.ValidationError({
+                        "error": f"Products with IDs {invalid_ids} either don't exist or don't belong to you."
+                    })
+            else:
+                # For admins, just validate that the products exist
+                products = Product.objects.filter(product_id__in=product_ids)
+                
+                # Check if all requested products were found
+                found_ids = set(str(p.product_id) for p in products)
+                requested_ids = set(product_ids)
+                invalid_ids = requested_ids - found_ids
+                
+                if invalid_ids:
+                    raise serializers.ValidationError({
+                        "error": f"Products with IDs {invalid_ids} don't exist."
+                    })
+            
+            # Update the products
+            promo.product_id.set(products)
+        
+        return promo
+
+    def perform_destroy(self, instance):
+        """Handle promo deletion with proper product updates"""
+        from django.db import transaction
+        
+        try:
+            with transaction.atomic():
+                # Get all affected products before deletion
+                affected_products = list(instance.product_id.all())
+                
+                # Delete the promo
+                instance.delete()
+                
+                # Update each product's discount fields
+                from .services.promo_services import update_product_discounted_price
+                for product in affected_products:
+                    update_product_discounted_price(product)
+                    product.refresh_from_db()
+        except Exception as e:
+            raise serializers.ValidationError({
+                "error": f"Error deleting promo: {str(e)}"
+            })
 
 
 #CART

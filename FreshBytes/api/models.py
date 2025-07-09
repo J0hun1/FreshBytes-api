@@ -7,6 +7,8 @@ from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, Permis
 from django.contrib.auth.hashers import make_password
 from .services.product_services import update_seller_total_products
 from .services.promo_services import update_products_has_promo_on_promo_save, update_products_has_promo_on_promo_delete, update_products_has_promo_on_m2m_change
+from django.db.models.signals import pre_delete
+from .choices import ProductStatus, Discount_Type, OrderStatus
 
 class UserManager(BaseUserManager):
     def create_user(self, user_email, password=None, **extra_fields):
@@ -164,11 +166,6 @@ class SubCategory(models.Model):
         super().save(*args, **kwargs)
     
 #PRODUCT 
-class ProductStatus(models.TextChoices):
-    ROTTEN = 'ROTTEN', 'Rotten'
-    SLIGHTLY_WITHERED = 'SLIGHTLY_WITHERED', 'Slightly Withered'
-    FRESH = 'FRESH', 'Fresh'
-    
 class Product(models.Model):
     product_id = models.CharField(primary_key=True, max_length=10, unique=True, editable=False)
     seller_id = models.ForeignKey(Seller, on_delete=models.CASCADE, null=True)
@@ -178,7 +175,15 @@ class Product(models.Model):
     product_full_description = models.CharField(max_length=255)
     product_discountedPrice = models.DecimalField(max_digits=10, decimal_places=2, null=True)
     product_sku = models.CharField(max_length=255, unique=True, editable=False)
-    product_status = models.CharField(max_length=20, choices=ProductStatus.choices, default=ProductStatus.FRESH)
+    product_status = models.CharField(
+        max_length=20,
+        choices=[
+            ('ROTTEN', 'Rotten'),
+            ('SLIGHTLY_WITHERED', 'Slightly Withered'),
+            ('FRESH', 'Fresh')
+        ],
+        default='FRESH'
+    )
     product_location = models.CharField(max_length=255, null=True)
     sub_category_id = models.ForeignKey(SubCategory, on_delete=models.CASCADE, null=True)
     has_promo = models.BooleanField(default=False)
@@ -195,6 +200,7 @@ class Product(models.Model):
     sell_count = models.IntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    _skip_update = False  # Flag to prevent recursive updates
 
     @property
     def user_id(self):
@@ -211,11 +217,18 @@ class Product(models.Model):
         return None
 
     def update_discounted_price(self):
-        from .services.product_services import update_product_discounted_price
-        update_product_discounted_price(self)
+        if not self._skip_update and self.pk:  # Only update if product exists and not in recursive update
+            from .services.product_services import update_product_discounted_price
+            self._skip_update = True  # Set flag to prevent recursion
+            try:
+                update_product_discounted_price(self)
+            finally:
+                self._skip_update = False  # Reset flag
 
     def save(self, *args, **kwargs):
         from .services.product_services import generate_product_id, generate_product_sku
+        
+        is_new = not self.pk  # Check if this is a new product
         
         if not self.product_id:
             last_product = Product.objects.order_by('-created_at').first()
@@ -225,8 +238,7 @@ class Product(models.Model):
             counter = 0
             while True:
                 try:
-                    seller_products_count = Product.objects.filter(seller_id=self.seller_id).count() + 1
-                    self.product_sku = generate_product_sku(self, seller_products_count, counter)
+                    self.product_sku = generate_product_sku(self, counter=counter)
                     if not Product.objects.filter(product_sku=self.product_sku).exists():
                         break
                     counter += 1
@@ -238,7 +250,12 @@ class Product(models.Model):
         if self.product_price > 0 and (self.product_discountedPrice is None or self.product_discountedPrice <= 0):
             self.is_srp = True
 
+        # First save the product
         super().save(*args, **kwargs)
+        
+        # Then update discount fields if it's not a new product and we're not in a recursive update
+        if not is_new and not self._skip_update and 'update_fields' not in kwargs:
+            self.update_discounted_price()
 
     class Meta:
         db_table = 'Products'
@@ -288,15 +305,22 @@ class Reviews(models.Model):
 
 
 #PROMO
-class Discount_Type(models.TextChoices):
-    PERCENTAGE = 'PERCENTAGE', 'Percentage'
-    FIXED = 'FIXED', 'Fixed'
-
 class PromoProduct(models.Model):
     """Intermediate model for Promo-Product relationship"""
     promo = models.ForeignKey('Promo', on_delete=models.CASCADE)
     product = models.ForeignKey('Product', on_delete=models.CASCADE)
     created_at = models.DateTimeField(auto_now_add=True)
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        # Update product's discount fields
+        self.product.update_discounted_price()
+
+    def delete(self, *args, **kwargs):
+        product = self.product  # Store reference before deletion
+        super().delete(*args, **kwargs)
+        # Update product's discount fields after removing promo
+        product.update_discounted_price()
 
     class Meta:
         db_table = 'PromoProduct'
@@ -308,7 +332,14 @@ class Promo(models.Model):
     product_id = models.ManyToManyField(Product, through='PromoProduct', related_name='promos')
     promo_description = models.CharField(max_length=255, default="")
     promo_name = models.CharField(max_length=255)
-    discount_type = models.CharField(max_length=255, choices=Discount_Type.choices, default=Discount_Type.FIXED)
+    discount_type = models.CharField(
+        max_length=255,
+        choices=[
+            ('PERCENTAGE', 'Percentage'),
+            ('FIXED', 'Fixed')
+        ],
+        default='FIXED'
+    )
     discount_amount = models.IntegerField(default=0)
     discount_percentage = models.IntegerField(default=0)
     is_active = models.BooleanField(default=True)
@@ -345,15 +376,18 @@ class Promo(models.Model):
 
 
 # Signal handlers for Promo-Product relationship
-@receiver([post_save, post_delete], sender=Promo)
-def handle_promo_changes(sender, instance, **kwargs):
-    """Handle both creation and deletion of promos"""
-    from .services.promo_services import update_products_has_promo_on_promo_save, update_products_has_promo_on_promo_delete
-    
-    if kwargs.get('created', False) or not kwargs.get('raw', False):
+@receiver(post_save, sender=Promo)
+def handle_promo_save(sender, instance, created, **kwargs):
+    """Handle promo creation and updates"""
+    from .services.promo_services import update_products_has_promo_on_promo_save
+    if not kwargs.get('raw', False):
         update_products_has_promo_on_promo_save(instance)
-    elif kwargs.get('signal') == post_delete:
-        update_products_has_promo_on_promo_delete(instance)
+
+@receiver(pre_delete, sender=Promo)
+def handle_promo_pre_delete(sender, instance, **kwargs):
+    """Handle promo deletion by updating products before the promo is deleted"""
+    from .services.promo_services import update_products_has_promo_on_promo_delete
+    update_products_has_promo_on_promo_delete(instance)
 
 @receiver(models.signals.m2m_changed, sender=Promo.product_id.through)
 def handle_promo_m2m_changes(sender, instance, action, pk_set, **kwargs):
@@ -409,14 +443,6 @@ class CartItem(models.Model):
 
 
 #ORDER
-class OrderStatus(models.TextChoices):
-    PENDING = 'PENDING', 'Pending'
-    CONFIRMED = 'CONFIRMED', 'Confirmed'
-    SHIPPED = 'SHIPPED', 'Shipped'
-    DELIVERED = 'DELIVERED', 'Delivered'
-    CANCELLED = 'CANCELLED', 'Cancelled'
-    REFUNDED = 'REFUNDED', 'Refunded'
-
 class Order(models.Model):
     order_id = models.CharField(primary_key=True, max_length=10, unique=True, editable=False)
     
@@ -435,7 +461,18 @@ class Order(models.Model):
     order_total = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     discount_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     discount_percentage = models.IntegerField(default=0)
-    order_status = models.CharField(max_length=255, choices=OrderStatus.choices, default=OrderStatus.PENDING)
+    order_status = models.CharField(
+        max_length=255,
+        choices=[
+            ('PENDING', 'Pending'),
+            ('CONFIRMED', 'Confirmed'),
+            ('SHIPPED', 'Shipped'),
+            ('DELIVERED', 'Delivered'),
+            ('CANCELLED', 'Cancelled'),
+            ('REFUNDED', 'Refunded')
+        ],
+        default='PENDING'
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     

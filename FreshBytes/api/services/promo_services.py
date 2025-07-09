@@ -103,14 +103,33 @@ def update_products_has_promo_on_promo_save(promo):
 
 def update_products_has_promo_on_promo_delete(promo):
     """
-    Updates has_promo field for all products when a promo is deleted.
+    Updates all discount-related fields for all products when a promo is deleted.
     """
     try:
         with transaction.atomic():
-            products = promo.product_id.all()
-            logger.info(f"Removing promo {promo.promo_id} from {products.count()} products")
+            # Get all affected products before deletion
+            products = list(promo.product_id.all())  # Convert to list to avoid query after deletion
+            logger.info(f"Removing promo {promo.promo_id} from {len(products)} products")
+            
+            # Update each product's discount fields
             for product in products:
-                update_product_has_promo_field(product)
+                # This will recalculate discounts based on remaining active promos
+                update_product_discounted_price(product)
+                product.refresh_from_db()  # Ensure we have latest data
+                
+                # Double-check if product still has any active promos
+                has_other_active_promos = product.promos.filter(
+                    is_active=True,
+                    promo_start_date__lte=timezone.now(),
+                    promo_end_date__gte=timezone.now()
+                ).exclude(promo_id=promo.promo_id).exists()
+                
+                if not has_other_active_promos:
+                    logger.info(f"No other active promos for product {product.product_id}, resetting discount fields")
+                    product.product_discountedPrice = None
+                    product.is_discounted = False
+                    product.has_promo = False
+                    product.save(update_fields=['product_discountedPrice', 'is_discounted', 'has_promo'])
     except Exception as e:
         logger.error(f"Error removing promo {promo.promo_id} from products: {str(e)}")
         raise

@@ -4,6 +4,10 @@ def update_product_has_promo_field(product):
     """
     Updates the has_promo field for a given product based on active promos.
     """
+    # Skip updates for deleted products
+    if product.is_deleted:
+        return
+        
     from ...api.models import Promo
     active_promos = Promo.objects.filter(
         product_id=product,
@@ -40,10 +44,21 @@ def generate_product_id(last_product):
             return "prod00125"
     return "prod00125"
 
-def generate_product_sku(product, seller_products_count, counter=0):
+def generate_product_sku(product, seller_products_count=None, counter=0):
     """Generate unique SKU for product"""
     prefix = product.product_name[:3].upper() if len(product.product_name) >= 3 else product.product_name.upper()
     seller_id_suffix = product.seller_id.seller_id[-5:] if product.seller_id and len(product.seller_id.seller_id) >= 5 else "00000"
+    
+    # If seller_products_count is not provided, get it from the database
+    if seller_products_count is None:
+        # Use raw SQL to avoid model instantiation
+        from django.db import connection
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT COUNT(*) FROM Products WHERE seller_id_id = %s",
+                [product.seller_id.seller_id]
+            )
+            seller_products_count = cursor.fetchone()[0] + 1
     
     if counter > 0:
         return f"{prefix}{seller_products_count:03d}{seller_id_suffix}_{counter}"
@@ -52,6 +67,10 @@ def generate_product_sku(product, seller_products_count, counter=0):
 def update_product_discounted_price(product):
     """Update product's discounted price based on active promos"""
     from ..models import Discount_Type
+    
+    # Skip updates for deleted products
+    if product.is_deleted:
+        return
     
     active_promos = product.promos.filter(
         is_active=True,
@@ -63,7 +82,7 @@ def update_product_discounted_price(product):
         product.product_discountedPrice = None
         product.is_discounted = False
         product.has_promo = False
-        product.save()
+        product.save(update_fields=['product_discountedPrice', 'is_discounted', 'has_promo'])
         return
 
     best_promo = active_promos.first()
@@ -76,4 +95,4 @@ def update_product_discounted_price(product):
     product.product_discountedPrice = max(0, product.product_price - discount)
     product.is_discounted = True
     product.has_promo = True
-    product.save()
+    product.save(update_fields=['product_discountedPrice', 'is_discounted', 'has_promo'])
