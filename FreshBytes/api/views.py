@@ -484,3 +484,26 @@ class TestAuthView(APIView):
                 'name': request.user.user_name
             }
         })
+
+class DeletedUsersListDelete(generics.ListAPIView):
+    """List users with is_deleted=True and allow bulk hard delete"""
+    serializer_class = UserSerializer
+    permission_classes = [IsAuthenticated, IsAdmin]
+
+    def get_queryset(self):
+        return User.objects.filter(is_deleted=True)
+
+    def delete(self, request, *args, **kwargs):
+        count = User.objects.filter(is_deleted=True).count()
+        User.objects.filter(is_deleted=True).delete()
+        return Response({"deleted": count}, status=status.HTTP_204_NO_CONTENT)
+
+
+class DeletedUserRetrieveDestroy(generics.RetrieveDestroyAPIView):
+    """Retrieve or permanently delete a single soft-deleted user"""
+    serializer_class = UserSerializer
+    permission_classes = [IsAuthenticated, IsAdmin]
+    lookup_field = "pk"
+
+    def get_queryset(self):
+        return User.objects.filter(is_deleted=True)

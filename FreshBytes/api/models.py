@@ -9,6 +9,7 @@ from .services.product_services import update_seller_total_products
 from .services.promo_services import update_products_has_promo_on_promo_save, update_products_has_promo_on_promo_delete, update_products_has_promo_on_m2m_change
 from django.db.models.signals import pre_delete
 from .choices import ProductStatus, Discount_Type, OrderStatus
+import uuid
 
 class UserManager(BaseUserManager):
     def create_user(self, user_email, password=None, **extra_fields):
@@ -26,7 +27,6 @@ class UserManager(BaseUserManager):
     def create_superuser(self, user_email, password=None, **extra_fields):
         extra_fields.setdefault('is_staff', True)
         extra_fields.setdefault('is_superuser', True)
-        extra_fields.setdefault('is_admin', True)
         extra_fields.setdefault('role', 'admin')
         extra_fields.setdefault('is_active', True)
 
@@ -44,7 +44,7 @@ class User(AbstractBaseUser, PermissionsMixin):
         ('customer', 'Customer'),
     ]
 
-    user_id = models.CharField(primary_key=True, max_length=10, unique=True, editable=False)
+    user_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False, unique=True)
     user_name = models.CharField(max_length=255)
     first_name = models.CharField(max_length=255)
     last_name = models.CharField(max_length=255)
@@ -67,12 +67,9 @@ class User(AbstractBaseUser, PermissionsMixin):
     REQUIRED_FIELDS = ['user_name', 'first_name', 'last_name']
 
     def save(self, *args, **kwargs):
-        from .services.users_services import generate_user_id, validate_user_role
+        from .services.users_services import validate_user_role
         
-        if not self.user_id:
-            last_user = User.objects.order_by('-created_at').first()
-            self.user_id = generate_user_id(last_user)
-
+        # Ensure user_id is set (UUID will be generated automatically)
         self = validate_user_role(self)
         super().save(*args, **kwargs)
 

@@ -28,6 +28,9 @@ urlpatterns = [
     # USERS 
     path("users/", views.UserPostListCreate.as_view(), name="users"),
     path("users/<str:pk>/", views.UserPostRetrieveUpdateDestroy.as_view(), name="user-detail"),
+    # Deleted users endpoints
+    path("users/deleted/", views.DeletedUsersListDelete.as_view(), name="deleted-users"),
+    path("users/deleted/<uuid:pk>/", views.DeletedUserRetrieveDestroy.as_view(), name="deleted-user-detail"),
 
     # SELLERS 
     path("sellers/", views.AllSellersPostListCreate.as_view(), name="seller-list-create"),
