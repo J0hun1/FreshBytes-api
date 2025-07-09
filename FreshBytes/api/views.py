@@ -147,10 +147,28 @@ class UserPostRetrieveUpdateDestroy(generics.RetrieveUpdateDestroyAPIView):
 class AllSellersPostListCreate(generics.ListCreateAPIView):
     queryset = Seller.objects.all()
     serializer_class = SellerSerializer
-    def delete(self, request, *args, **kwargs):
-        #deletes all sellers
-        Seller.objects.all().delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
+    permission_classes = [IsAuthenticated]
+
+    def perform_create(self, serializer):
+        """Create a seller profile for the authenticated user.
+        If the user was a customer, promote their role to 'seller'.
+        Prevent duplicate seller profiles.
+        """
+        user = self.request.user
+
+        # Prevent duplicate seller profiles
+        if hasattr(user, 'seller_profile'):
+            raise serializers.ValidationError({"error": "Seller profile already exists for this user."})
+
+        # Save the seller linked to the user
+        seller = serializer.save(user_id=user)
+
+        # Promote role if necessary (skip admins)
+        if user.role == 'customer':
+            user.role = 'seller'
+            user.save(update_fields=["role"])
+
+        return seller
 
 #allows to access, update, and delete individual sellers
 class AllSellersPostRetrieveUpdateDestroy(generics.RetrieveUpdateDestroyAPIView):
@@ -162,9 +180,26 @@ class AllSellersPostRetrieveUpdateDestroy(generics.RetrieveUpdateDestroyAPIView)
 class SellerProductsPostListCreate(generics.ListCreateAPIView):
     serializer_class = ProductSerializer
 
+    permission_classes = [IsAuthenticated]
+
     def get_queryset(self):
         seller_id = self.kwargs['seller_id']
         return Product.objects.filter(seller_id=seller_id, is_deleted=False)
+
+    def perform_create(self, serializer):
+        """Create a product ensuring the authenticated user owns the seller profile"""
+        seller_id_param = self.kwargs['seller_id']
+        try:
+            seller = Seller.objects.get(pk=seller_id_param)
+        except Seller.DoesNotExist:
+            raise serializers.ValidationError({"error": "Seller not found"})
+
+        # Only the owner or admin can add products
+        user = self.request.user
+        if user.role != 'admin' and seller.user_id != user:
+            raise serializers.ValidationError({"error": "You do not own this seller profile"})
+
+        serializer.save(seller_id=seller)
 
 
 class SellerProductPostRetrieveUpdateDestroy(generics.RetrieveUpdateDestroyAPIView):

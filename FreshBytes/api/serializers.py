@@ -36,6 +36,7 @@ class ProductSerializer(serializers.ModelSerializer):
         ],
         default='FRESH'
     )
+    product_sku = serializers.CharField(required=False, allow_blank=True, allow_null=True, max_length=50)
 
     class Meta:
         model = Product
@@ -54,6 +55,24 @@ class ProductSerializer(serializers.ModelSerializer):
     def validate_product_price(self, value):
         if value <= 0:
             raise serializers.ValidationError("Product price must be greater than 0.")
+        return value
+
+    def validate_product_sku(self, value):
+        if not value:
+            return value
+        view = self.context.get('view')
+        seller_id = None
+        if view:
+            seller_id = view.kwargs.get('seller_id')
+        # During update, instance may exist
+        instance = getattr(self, 'instance', None)
+        qs = Product.objects.all()
+        if seller_id:
+            qs = qs.filter(seller_id=seller_id)
+        if instance:
+            qs = qs.exclude(pk=instance.pk)
+        if qs.filter(product_sku=value).exists():
+            raise serializers.ValidationError("SKU already exists for this seller.")
         return value
     
 

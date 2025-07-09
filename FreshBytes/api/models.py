@@ -160,14 +160,14 @@ class SubCategory(models.Model):
     
 #PRODUCT 
 class Product(models.Model):
-    product_id = models.CharField(primary_key=True, max_length=10, unique=True, editable=False)
+    product_id = models.CharField(primary_key=True, max_length=36, unique=True, editable=False, default=uuid.uuid4)
     seller_id = models.ForeignKey(Seller, on_delete=models.CASCADE, null=True)
     product_name = models.CharField(max_length=255)
     product_price = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     product_brief_description = models.CharField(max_length=255)
     product_full_description = models.CharField(max_length=255)
     product_discountedPrice = models.DecimalField(max_digits=10, decimal_places=2, null=True)
-    product_sku = models.CharField(max_length=255, unique=True, editable=False)
+    product_sku = models.CharField(max_length=50, null=True, blank=True)
     product_status = models.CharField(
         max_length=20,
         choices=[
@@ -219,26 +219,18 @@ class Product(models.Model):
                 self._skip_update = False  # Reset flag
 
     def save(self, *args, **kwargs):
-        from .services.product_services import generate_product_id, generate_product_sku
+        from .services.product_services import generate_product_sku
         
         is_new = not self.pk  # Check if this is a new product
         
-        if not self.product_id:
-            last_product = Product.objects.order_by('-created_at').first()
-            self.product_id = generate_product_id(last_product)
+        # product_id auto-set by default using UUID
 
         if not self.product_sku:
-            counter = 0
-            while True:
-                try:
-                    self.product_sku = generate_product_sku(self, counter=counter)
-                    if not Product.objects.filter(product_sku=self.product_sku).exists():
-                        break
-                    counter += 1
-                except Exception:
-                    counter += 1
-                if counter > 1000:
-                    raise ValueError("Unable to generate unique SKU after 1000 attempts")
+            # Optionally auto-generate SKU (not enforced unique globally)
+            try:
+                self.product_sku = generate_product_sku(self)
+            except Exception:
+                pass  # leave blank if generator fails
 
         if self.product_price > 0 and (self.product_discountedPrice is None or self.product_discountedPrice <= 0):
             self.is_srp = True

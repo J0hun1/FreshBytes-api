@@ -32,11 +32,11 @@ urlpatterns = [
 
     # SELLERS 
     path("sellers/", views.AllSellersPostListCreate.as_view(), name="seller-list-create"),
-    path("sellers/<str:pk>/", views.AllSellersPostRetrieveUpdateDestroy.as_view(), name="seller-detail"),
-    path("sellers/<str:seller_id>/products/", views.SellerProductsPostListCreate.as_view(), name="seller-products"),
-    path("sellers/<str:seller_id>/products/<str:product_id>/", views.SellerProductPostRetrieveUpdateDestroy.as_view(), name="seller-product-detail"),
+    path("sellers/<uuid:pk>/", views.AllSellersPostRetrieveUpdateDestroy.as_view(), name="seller-detail"),
+    path("sellers/<uuid:seller_id>/products/", views.SellerProductsPostListCreate.as_view(), name="seller-products"),
+    path("sellers/<uuid:seller_id>/products/<uuid:product_id>/", views.SellerProductPostRetrieveUpdateDestroy.as_view(), name="seller-product-detail"),
 
-    path("sellers/<str:seller_id>/<str:product_id>/", views.SellerProductPostRetrieveUpdateDestroy.as_view(), name="seller-product-delete"),
+    path("sellers/<uuid:seller_id>/<uuid:product_id>/", views.SellerProductPostRetrieveUpdateDestroy.as_view(), name="seller-product-delete"),
 
     # REVIEWS
     path("reviews/", views.ReviewsPostListCreate.as_view(), name="reviews"),
