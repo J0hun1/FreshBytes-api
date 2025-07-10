@@ -28,6 +28,12 @@ class IsCustomer(BasePermission):
     def has_permission(self, request, view):
         return request.user and request.user.role == 'customer'
 
+# New permission: allow either sellers or admins
+class IsSellerOrAdmin(BasePermission):
+    """Permission that allows access to users with role 'seller' OR 'admin'."""
+    def has_permission(self, request, view):
+        return request.user and request.user.role in ['seller', 'admin']
+
 # Authentication Views
 class CustomTokenObtainPairView(TokenObtainPairView):
     permission_classes = [AllowAny]
@@ -150,23 +156,40 @@ class AllSellersPostListCreate(generics.ListCreateAPIView):
     permission_classes = [IsAuthenticated]
 
     def perform_create(self, serializer):
-        """Create a seller profile for the authenticated user.
-        If the user was a customer, promote their role to 'seller'.
-        Prevent duplicate seller profiles.
-        """
-        user = self.request.user
+        """Create a seller profile.
 
-        # Prevent duplicate seller profiles
-        if hasattr(user, 'seller_profile'):
+        Behaviour:
+        • Customers can create *their own* seller profile – their role is promoted to "seller".
+        • Admins can create a seller profile for *any* user by passing the user's `user_id` in the
+          request body. The target user is promoted to "seller" if necessary.
+        • Duplicate seller profiles are prevented for the target user.
+        """
+
+        request_user = self.request.user  # The user making the API request
+
+        # Determine which user the new Seller will be linked to
+        target_user = request_user
+        if request_user.role == 'admin':
+            # Admins may specify a `user_id` in the payload to create a seller for someone else
+            payload_user_id = self.request.data.get('user_id')
+            if payload_user_id:
+                try:
+                    from .models import User  # Local import to avoid circular refs at top-level
+                    target_user = User.objects.get(pk=payload_user_id)
+                except User.DoesNotExist:
+                    raise serializers.ValidationError({"error": "Target user not found."})
+
+        # Prevent duplicate seller profiles for the *target* user
+        if hasattr(target_user, 'seller_profile'):
             raise serializers.ValidationError({"error": "Seller profile already exists for this user."})
 
-        # Save the seller linked to the user
-        seller = serializer.save(user_id=user)
+        # Create the seller linked to the target user
+        seller = serializer.save(user_id=target_user)
 
-        # Promote role if necessary (skip admins)
-        if user.role == 'customer':
-            user.role = 'seller'
-            user.save(update_fields=["role"])
+        # Promote role if necessary (skip if already seller/admin)
+        if target_user.role == 'customer':
+            target_user.role = 'seller'
+            target_user.save(update_fields=["role"])
 
         return seller
 
@@ -175,6 +198,21 @@ class AllSellersPostRetrieveUpdateDestroy(generics.RetrieveUpdateDestroyAPIView)
     queryset = Seller.objects.all()
     serializer_class = SellerSerializer
     lookup_field = "pk"
+
+    def perform_destroy(self, instance):
+        """Delete the seller profile and revert the linked user's role to 'customer'.
+
+        • If the linked user currently has role 'seller', switch it back to 'customer'.
+        • Admin roles are left unchanged.
+        """
+        linked_user = instance.user_id
+        # Remove the Seller profile first
+        super().perform_destroy(instance)
+
+        # Re-evaluate the user's role
+        if linked_user and linked_user.role == 'seller':
+            linked_user.role = 'customer'
+            linked_user.save(update_fields=["role"])
 
 # Get products by seller  
 class SellerProductsPostListCreate(generics.ListCreateAPIView):
@@ -243,7 +281,8 @@ class ReviewsPostRetrieveUpdateDestroy(generics.RetrieveUpdateDestroyAPIView):
 class PromoPostListCreate(generics.ListCreateAPIView):
     queryset = Promo.objects.all()
     serializer_class = PromoSerializer
-    permission_classes = [IsAuthenticated, IsSeller]  # Only sellers can create promos
+    # Allow sellers or admins to access this endpoint (admins get read/delete; sellers get full access)
+    permission_classes = [IsAuthenticated, IsSellerOrAdmin]
 
     def perform_create(self, serializer):
         """Handle the creation of a new promo with products"""

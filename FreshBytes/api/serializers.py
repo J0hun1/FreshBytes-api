@@ -89,6 +89,11 @@ class SubCategorySerializer(serializers.ModelSerializer):
 
 class UserSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=True)
+    # Expose `is_admin` as a read-only property derived from the user's role
+    is_admin = serializers.SerializerMethodField(read_only=True)
+
+    def get_is_admin(self, obj):
+        return obj.is_admin
     
     class Meta:
         model = User
@@ -105,7 +110,6 @@ class UserSerializer(serializers.ModelSerializer):
         if validated_data.get('role') == 'admin':
             validated_data['is_staff'] = True
             validated_data['is_superuser'] = True
-            validated_data['is_admin'] = True
         return super().create(validated_data)
 
     def update(self, instance, validated_data):
