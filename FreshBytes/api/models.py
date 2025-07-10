@@ -73,10 +73,6 @@ class User(AbstractBaseUser, PermissionsMixin):
         self = validate_user_role(self)
         super().save(*args, **kwargs)
 
-    @property
-    def is_admin(self):
-        return self.role == 'admin'
-
     class Meta:
         verbose_name = 'User'
         verbose_name_plural = 'Users'
@@ -312,7 +308,8 @@ class PromoProduct(models.Model):
         unique_together = ('promo', 'product')
 
 class Promo(models.Model):
-    promo_id = models.CharField(primary_key=True, max_length=10, unique=True, editable=False)
+    # Surrogate UUID primary key for promos (seller-agnostic, best-practice)
+    promo_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False, unique=True)
     seller_id = models.ForeignKey(Seller, on_delete=models.CASCADE, default=None)
     product_id = models.ManyToManyField(Product, through='PromoProduct', related_name='promos')
     promo_description = models.CharField(max_length=255, default="")
@@ -334,27 +331,18 @@ class Promo(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     def save(self, *args, **kwargs):
+        """Custom save to ensure valid date range and propagate promo flags."""
         from .services.promo_services import update_products_has_promo_on_promo_save
-        
-        if not self.promo_id:
-            last_promo = Promo.objects.order_by('-created_at').first()
-            if last_promo:
-                last_id = int(last_promo.promo_id[3:6])
-                new_id = f"pid{last_id + 1:03d}25"
-            else:
-                new_id = "pid00125"
-            self.promo_id = new_id
 
         # Ensure end date is after start date
         if self.promo_end_date <= self.promo_start_date:
             self.promo_end_date = self.promo_start_date + timezone.timedelta(days=7)
 
-        # First save the promo
+        # Save normally (UUID is generated automatically)
         super().save(*args, **kwargs)
-        
-        # Then update all associated products
-        if self.pk:  # Only if promo exists in database
-            update_products_has_promo_on_promo_save(self)
+
+        # Update associated products
+        update_products_has_promo_on_promo_save(self)
 
     class Meta:
         db_table = 'Promo'

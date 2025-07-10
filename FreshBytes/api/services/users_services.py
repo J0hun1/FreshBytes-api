@@ -10,15 +10,34 @@ def generate_user_id(last_user):
     return f"uid001{current_year:02d}"
 
 def validate_user_role(user):
-    """Validate user role and permissions"""
+    """Ensure role ↔ permissions consistency.
+
+    Rules:
+    1. If `is_superuser` is True → force role to "admin" and `is_staff` True.
+    2. If role is "admin" but `is_superuser` was set to False → demote role to "customer" and clear staff/superuser flags.
+    3. For non-admin roles, ensure `is_staff` and `is_superuser` are False.
+    4. Sellers must still have an email address.
+    """
+
+    # Business validation
     if user.role == 'seller' and not user.user_email:
         raise ValidationError('Sellers must have an email address')
-    
-    # Set admin permissions
-    if user.role == 'admin':
+
+    # --- Synchronise role and permission flags ---
+
+    if user.is_superuser:
+        # Promotion: make sure everything else is in sync
+        user.role = 'admin'
         user.is_staff = True
-        user.is_superuser = True
-    
+    else:
+        # No longer a superuser.
+        if user.role == 'admin':
+            # Demote to customer when super privileges revoked
+            user.role = 'customer'
+        # Regardless of old role, ensure staff/superuser flags are cleared.
+        user.is_staff = False
+        user.is_superuser = False
+
     return user
 
 def set_default_password(user, password):

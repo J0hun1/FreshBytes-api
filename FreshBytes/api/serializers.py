@@ -88,24 +88,27 @@ class SubCategorySerializer(serializers.ModelSerializer):
 
 
 class UserSerializer(serializers.ModelSerializer):
-    password = serializers.CharField(write_only=True, required=True)
-    # Expose `is_admin` as a read-only property derived from the user's role
-    is_admin = serializers.SerializerMethodField(read_only=True)
+    # Password is optional for updates, required for user creation.
+    password = serializers.CharField(write_only=True, required=False, allow_blank=False)
 
-    def get_is_admin(self, obj):
-        return obj.is_admin
-    
     class Meta:
         model = User
         fields = ['user_id', 'user_name', 'first_name', 'last_name', 'user_email', 
                  'password', 'user_phone', 'user_address', 'role', 'created_at', 
-                 'updated_at', 'is_active', 'is_deleted', 'is_admin', 'is_superuser']
+                 'updated_at', 'is_active', 'is_deleted', 'is_superuser']
         read_only_fields = ['user_id', 'created_at', 'updated_at']
         extra_kwargs = {
             'password': {'write_only': True}
         }
 
+    def validate(self, attrs):
+        """Enforce that password is supplied on user creation, but optional on updates."""
+        if self.instance is None and not attrs.get('password'):
+            raise serializers.ValidationError({"password": "This field is required."})
+        return super().validate(attrs)
+
     def create(self, validated_data):
+        # `password` is guaranteed present here (see validate).
         validated_data['password'] = make_password(validated_data.get('password'))
         if validated_data.get('role') == 'admin':
             validated_data['is_staff'] = True

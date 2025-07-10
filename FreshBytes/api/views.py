@@ -337,18 +337,34 @@ class PromoPostListCreate(generics.ListCreateAPIView):
             return Promo.objects.filter(is_active=True)
 
     def delete(self, request, *args, **kwargs):
-        """Only allow sellers to delete their own promos or admins to delete any promo"""
+        """Bulk delete promos and ensure product discount fields are recalculated."""
+        from .services.promo_services import update_product_discounted_price
+
+        # Determine queryset based on role
         if request.user.role == 'admin':
-            Promo.objects.all().delete()
-            return Response(status=status.HTTP_204_NO_CONTENT)
+            promos_qs = Promo.objects.all()
         elif request.user.role == 'seller':
-            Promo.objects.filter(seller_id__user_id=request.user).delete()
-            return Response(status=status.HTTP_204_NO_CONTENT)
+            promos_qs = Promo.objects.filter(seller_id__user_id=request.user)
         else:
             return Response(
                 {"error": "Only sellers can delete their own promos or admins can delete all promos."},
                 status=status.HTTP_403_FORBIDDEN
             )
+
+        # Collect affected products BEFORE deletion
+        from django.db.models import Prefetch
+        products_to_update = set()
+        for promo in promos_qs.prefetch_related('product_id'):
+            products_to_update.update(list(promo.product_id.all()))
+
+        # Delete promos in bulk
+        promos_qs.delete()
+
+        # Recalculate discounts on affected products
+        for product in products_to_update:
+            update_product_discounted_price(product)
+
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 class PromoPostRetrieveUpdateDestroy(generics.RetrieveUpdateDestroyAPIView):
     queryset = Promo.objects.all()
