@@ -47,8 +47,14 @@ urlpatterns = [
     path("promos/<str:pk>/", views.PromoPostRetrieveUpdateDestroy.as_view(), name="promo-detail"),
 
     # CART
-    path("carts/", views.CartPostListCreate.as_view(), name="carts"),
-    path("cart-items/", views.CartItemPostListCreate.as_view(), name="cart-items"),
+    # path("carts/", views.CartPostListCreate.as_view(), name="carts"),
+    path('cart/', views.CartViewSet.as_view({
+        'get': 'list',
+        'post': 'create'
+    }), name='cart'),
+    path('cart/update-item/', views.CartViewSet.as_view({'post': 'update_item'}), name='cart-update-item'),
+    path('cart/remove-item/', views.CartViewSet.as_view({'post': 'remove_item'}), name='cart-remove-item'),
+    path('cart/clear/', views.CartViewSet.as_view({'post': 'clear'}), name='cart-clear'),
 
     # ORDERS 
     path("orders/", views.OrderPostListCreate.as_view(), name="orders"),

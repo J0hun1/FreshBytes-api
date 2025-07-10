@@ -10,6 +10,7 @@ from .services.promo_services import update_products_has_promo_on_promo_save, up
 from django.db.models.signals import pre_delete
 from .choices import ProductStatus, Discount_Type, OrderStatus
 import uuid
+from django.conf import settings
 
 class UserManager(BaseUserManager):
     def create_user(self, user_email, password=None, **extra_fields):
@@ -373,46 +374,51 @@ def handle_promo_m2m_changes(sender, instance, action, pk_set, **kwargs):
 
 #CART
 class Cart(models.Model):
-    cart_id = models.CharField(primary_key=True, max_length=10, unique=True, editable=False)
-
-    def save(self, *args, **kwargs):
-        if not self.cart_id:
-            last_cart = Cart.objects.order_by('-created_at').first()
-            if last_cart:
-                last_id = int(last_cart.cart_id[3:6])  # Extract the numeric part after 'cid'
-                new_id = f"cid{last_id + 1:03d}25"
-            else:
-                new_id = "cid00125"
-            self.cart_id = new_id
-        super().save(*args, **kwargs)
-        
-    user_id = models.OneToOneField(User, on_delete=models.CASCADE, null=True, db_column='user_id')
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='cart'
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
-#CART ITEMS
+    class Meta:
+        db_table = 'Cart'
+
 class CartItem(models.Model):
-    cart_item_id = models.CharField(primary_key=True, max_length=12, unique=True, editable=False)
-    cart_id = models.ForeignKey(Cart, on_delete=models.CASCADE, null=True)
-    product_id = models.ForeignKey(Product, on_delete=models.CASCADE, null=True)
-    quantity = models.IntegerField(default=1)
-    total_item_price = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    discount_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    discount_percentage = models.IntegerField(default=0)
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    cart = models.ForeignKey(
+        Cart, 
+        on_delete=models.CASCADE,
+        related_name='items'
+    )
+    product = models.ForeignKey(
+        'Product',
+        on_delete=models.CASCADE
+    )
+    quantity = models.PositiveIntegerField(default=1)
+    unit_price = models.DecimalField(max_digits=10, decimal_places=2)
+    
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    class Meta:
+        db_table = 'CartItems'
+        unique_together = [['cart', 'product']]
+
     def save(self, *args, **kwargs):
-        from .services.cart_services import generate_cart_item_id, calculate_cart_item_total
-        
-        if not self.cart_item_id:
-            last_cart_item = CartItem.objects.order_by('-created_at').first()
-            self.cart_item_id = generate_cart_item_id(last_cart_item)
-        
-        if self.product_id:
-            self.total_item_price = calculate_cart_item_total(self.product_id, self.quantity)
-        
+        if not self.unit_price:
+            self.unit_price = (
+                self.product.product_discountedPrice 
+                if self.product.product_discountedPrice 
+                else self.product.product_price
+            )
         super().save(*args, **kwargs)
+
+    @property
+    def total_price(self):
+        return self.quantity * self.unit_price
 
 
 #ORDER
