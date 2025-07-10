@@ -12,7 +12,7 @@ def add_to_cart(user, product_id, quantity=1):
     """Add a product to user's cart. Update quantity if product already exists."""
     with transaction.atomic():
         cart = get_or_create_cart(user)
-        product = get_object_or_404(Product, id=product_id)
+        product = get_object_or_404(Product, pk=product_id)
         
         # Get or create cart item
         cart_item, created = CartItem.objects.get_or_create(
