@@ -598,3 +598,21 @@ class DeletedUserRetrieveDestroy(generics.RetrieveDestroyAPIView):
 
     def get_queryset(self):
         return User.objects.filter(is_deleted=True)
+
+class RestoreUser(APIView):
+    """Restore a soft-deleted user (set is_deleted=False and re-activate)."""
+    permission_classes = [IsAuthenticated, IsAdmin]
+
+    def post(self, request, pk):
+        try:
+            # Only allow restore if the user is currently soft-deleted
+            user = User.objects.get(pk=pk, is_deleted=True)
+        except User.DoesNotExist:
+            return Response({"error": "User not found or not deleted."}, status=status.HTTP_404_NOT_FOUND)
+
+        # Reactivate the user
+        user.is_deleted = False
+        user.is_active = True
+        user.save(update_fields=["is_deleted", "is_active"])
+
+        return Response(UserSerializer(user).data, status=status.HTTP_200_OK)
