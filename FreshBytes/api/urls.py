@@ -30,6 +30,8 @@ urlpatterns = [
     path("users/", views.UserPostListCreate.as_view(), name="users"),
     path("users/<uuid:pk>/", views.UserPostRetrieveUpdateDestroy.as_view(), name="user-detail"),
     path("users/restore/<uuid:pk>/", views.RestoreUser.as_view(), name="user-restore"),
+    path("users/disable/<uuid:pk>/", views.DisableUser.as_view(), name="user-disable"),
+    path("users/enable/<uuid:pk>/", views.EnableUser.as_view(), name="user-enable"),
 
     # SELLERS 
     path("sellers/", views.AllSellersPostListCreate.as_view(), name="seller-list-create"),

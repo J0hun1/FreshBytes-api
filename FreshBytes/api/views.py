@@ -17,6 +17,7 @@ from rest_framework import serializers
 from .services.cart_services import get_or_create_cart, add_to_cart, update_cart_item, remove_from_cart, clear_cart
 from django.core.exceptions import ValidationError
 from rest_framework.decorators import action
+from django.shortcuts import get_object_or_404
 
 # Custom permission classes
 class IsAdmin(BasePermission):
@@ -150,6 +151,52 @@ class UserPostRetrieveUpdateDestroy(generics.RetrieveUpdateDestroyAPIView):
         instance.is_deleted = True
         instance.is_active = False
         instance.save()
+
+
+class RestoreUser(APIView):
+    """Restore a soft-deleted user (set is_deleted=False and re-activate)."""
+    permission_classes = [IsAuthenticated, IsAdmin]
+
+    def post(self, request, pk):
+        try:
+            # Only allow restore if the user is currently soft-deleted
+            user = User.objects.get(pk=pk, is_deleted=True)
+        except User.DoesNotExist:
+            return Response({"error": "User not found or not deleted."}, status=status.HTTP_404_NOT_FOUND)
+
+        # Reactivate the user
+        user.is_deleted = False
+        user.is_active = True
+        user.save(update_fields=["is_deleted", "is_active"])
+
+        return Response(UserSerializer(user).data, status=status.HTTP_200_OK)
+
+class DisableUser(APIView):
+    permission_classes = [IsAuthenticated, IsAdmin]
+
+    def post(self, request, pk):
+        user = get_object_or_404(User, pk=pk, is_deleted=False)
+        if not user.is_active:
+            return Response({"detail": "User already inactive."}, status=400)
+
+        user.is_active = False
+        user.save(update_fields=["is_active"])
+
+        # (optional) blacklist current refresh token here
+        return Response({"detail": "User disabled."}, status=200)
+
+
+class EnableUser(APIView):
+    permission_classes = [IsAuthenticated, IsAdmin]
+
+    def post(self, request, pk):
+        user = get_object_or_404(User, pk=pk, is_deleted=False)
+        if user.is_active:
+            return Response({"detail": "User already active."}, status=400)
+
+        user.is_active = True
+        user.save(update_fields=["is_active"])
+        return Response(UserSerializer(user).data, status=200)
 
 
 #SELLERS
@@ -599,20 +646,3 @@ class DeletedUserRetrieveDestroy(generics.RetrieveDestroyAPIView):
     def get_queryset(self):
         return User.objects.filter(is_deleted=True)
 
-class RestoreUser(APIView):
-    """Restore a soft-deleted user (set is_deleted=False and re-activate)."""
-    permission_classes = [IsAuthenticated, IsAdmin]
-
-    def post(self, request, pk):
-        try:
-            # Only allow restore if the user is currently soft-deleted
-            user = User.objects.get(pk=pk, is_deleted=True)
-        except User.DoesNotExist:
-            return Response({"error": "User not found or not deleted."}, status=status.HTTP_404_NOT_FOUND)
-
-        # Reactivate the user
-        user.is_deleted = False
-        user.is_active = True
-        user.save(update_fields=["is_deleted", "is_active"])
-
-        return Response(UserSerializer(user).data, status=status.HTTP_200_OK)
