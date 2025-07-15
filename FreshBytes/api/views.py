@@ -7,11 +7,13 @@ from rest_framework.filters import SearchFilter, OrderingFilter
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.tokens import RefreshToken
-from .models import Product, Category, User, Seller, SubCategory, Reviews, Promo, Cart, CartItem, Order, OrderItem
+from django.db import models
+from .models import Product, Category, User, Seller, SubCategory, Reviews, Promo, Cart, CartItem, Order, OrderItem, ApprovalStatus
 from .serializers import (
     ProductSerializer, CategorySerializer, UserSerializer, SellerSerializer, 
     SubCategorySerializer, ReviewsSerializer, PromoSerializer, CartSerializer, 
-    CartItemSerializer, OrderSerializer, OrderItemSerializer, CustomTokenObtainPairSerializer
+    CartItemSerializer, OrderSerializer, OrderItemSerializer, CustomTokenObtainPairSerializer,
+    ApprovalStatusSerializer, ProcessApprovalSerializer, PendingApprovalSerializer
 )
 from rest_framework import serializers
 from .services.cart_services import get_or_create_cart, add_to_cart, update_cart_item, remove_from_cart, clear_cart
@@ -63,13 +65,44 @@ class LogoutView(APIView):
 
 #PRODUCTS
 class ProductPostListCreate(generics.ListCreateAPIView):
-    # getting Product objects that exist in the database
-    queryset = Product.objects.all() 
-    # serializing the data
     serializer_class = ProductSerializer
+    filter_backends = [SearchFilter, OrderingFilter, DjangoFilterBackend]
+    search_fields = ['product_name', 'product_brief_description', 'seller_id__business_name']
+    ordering_fields = ['created_at', 'product_name', 'product_price']
+    ordering = ['-created_at']
+    filterset_fields = ['sub_category_id', 'product_status', 'seller_id']
+
+    def get_queryset(self):
+        """Filter products based on user role and approval status"""
+        user = self.request.user
+        
+        # Base queryset - exclude deleted products
+        queryset = Product.objects.filter(is_deleted=False)
+        
+        if user.is_authenticated and user.role == 'admin':
+            # Admins can see all products regardless of approval status
+            return queryset
+        elif user.is_authenticated and user.role == 'seller':
+            # Sellers can see all approved products + their own products (any status)
+            return queryset.filter(
+                models.Q(approval_status='APPROVED') | 
+                models.Q(seller_id__user_id=user)
+            )
+        else:
+            # Anonymous users and customers can only see approved products
+            return queryset.filter(approval_status='APPROVED', is_active=True)
+    
+    def get_permissions(self):
+        """Set permissions based on the request method"""
+        if self.request.method == 'POST':
+            return [IsAuthenticated(), IsSeller()]
+        return [AllowAny()]
 
     #adds a delete endpoint to the list view
     def delete(self, request, *args, **kwargs):
+        if not (request.user.is_authenticated and request.user.role == 'admin'):
+            return Response({"error": "Only admins can perform this action."}, 
+                          status=status.HTTP_403_FORBIDDEN)
         #deletes all products
         Product.objects.all().delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
@@ -117,9 +150,17 @@ class SubCategoryPostRetrieveUpdateDestroy(generics.RetrieveUpdateDestroyAPIView
 
 #USERS
 class UserPostListCreate(generics.ListCreateAPIView):
-    queryset = User.objects.all()
     serializer_class = UserSerializer
     permission_classes = [IsAuthenticated, IsAdmin]
+    filter_backends = [SearchFilter, OrderingFilter, DjangoFilterBackend]
+    search_fields = ['user_name', 'first_name', 'last_name', 'user_email']
+    ordering_fields = ['created_at', 'user_name', 'role', 'approval_status']
+    ordering = ['-created_at']
+    filterset_fields = ['role', 'approval_status', 'is_active']
+
+    def get_queryset(self):
+        # Only admins can access this view, so show all users
+        return User.objects.filter(is_deleted=False)
 
     def delete(self, request, *args, **kwargs):
         if not (request.user.role == 'admin'):
@@ -267,12 +308,30 @@ class AllSellersPostRetrieveUpdateDestroy(generics.RetrieveUpdateDestroyAPIView)
 # Get products by seller  
 class SellerProductsPostListCreate(generics.ListCreateAPIView):
     serializer_class = ProductSerializer
-
     permission_classes = [IsAuthenticated]
+    filter_backends = [SearchFilter, OrderingFilter, DjangoFilterBackend]
+    search_fields = ['product_name', 'product_brief_description']
+    ordering_fields = ['created_at', 'product_name', 'product_price', 'approval_status']
+    ordering = ['-created_at']
+    filterset_fields = ['sub_category_id', 'product_status', 'approval_status']
 
     def get_queryset(self):
         seller_id = self.kwargs['seller_id']
-        return Product.objects.filter(seller_id=seller_id, is_deleted=False)
+        user = self.request.user
+        
+        # Base queryset for this seller's products
+        queryset = Product.objects.filter(seller_id=seller_id, is_deleted=False)
+        
+        # If the requesting user is the seller or an admin, show all their products
+        # Otherwise, only show approved products
+        try:
+            seller = Seller.objects.get(seller_id=seller_id)
+            if user.role == 'admin' or (seller.user_id and seller.user_id == user):
+                return queryset  # Show all products for owner/admin
+            else:
+                return queryset.filter(approval_status='APPROVED', is_active=True)
+        except Seller.DoesNotExist:
+            return queryset.filter(approval_status='APPROVED', is_active=True)
 
     def perform_create(self, serializer):
         """Create a product ensuring the authenticated user owns the seller profile"""
@@ -645,4 +704,191 @@ class DeletedUserRetrieveDestroy(generics.RetrieveDestroyAPIView):
 
     def get_queryset(self):
         return User.objects.filter(is_deleted=True)
+
+
+# Approval Management Views
+class PendingApprovalsListView(APIView):
+    """List all pending approvals (users and products)"""
+    permission_classes = [IsAuthenticated, IsAdmin]
+
+    def get(self, request):
+        from .services.approval_services import get_pending_approvals
+        
+        content_type = request.query_params.get('content_type', None)
+        pending_approvals = get_pending_approvals(content_type)
+        
+        approval_data = []
+        for approval in pending_approvals:
+            if approval.content_type == 'user':
+                try:
+                    user = User.objects.get(user_id=approval.object_id)
+                    approval_data.append({
+                        'object_id': approval.object_id,
+                        'content_type': approval.content_type,
+                        'created_at': approval.created_at,
+                        'object_name': f"{user.first_name} {user.last_name}",
+                        'object_details': {
+                            'user_name': user.user_name,
+                            'email': user.user_email,
+                            'role': user.role,
+                            'phone': user.user_phone,
+                        }
+                    })
+                except User.DoesNotExist:
+                    continue
+            elif approval.content_type == 'product':
+                try:
+                    product = Product.objects.get(product_id=approval.object_id)
+                    approval_data.append({
+                        'object_id': approval.object_id,
+                        'content_type': approval.content_type,
+                        'created_at': approval.created_at,
+                        'object_name': product.product_name,
+                        'object_details': {
+                            'price': str(product.product_price),
+                            'seller': product.seller_id.business_name if product.seller_id else 'Unknown',
+                            'category': product.sub_category_id.sub_category_name if product.sub_category_id else 'Unknown',
+                            'brief_description': product.product_brief_description,
+                        }
+                    })
+                except Product.DoesNotExist:
+                    continue
+        
+        serializer = PendingApprovalSerializer(approval_data, many=True)
+        return Response(serializer.data)
+
+
+class ProcessUserApprovalView(APIView):
+    """Process approval/rejection for a specific user"""
+    permission_classes = [IsAuthenticated, IsAdmin]
+
+    def post(self, request, user_id):
+        from .services.approval_services import process_approval
+        
+        try:
+            user = User.objects.get(user_id=user_id)
+        except User.DoesNotExist:
+            return Response(
+                {"error": "User not found"}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        serializer = ProcessApprovalSerializer(data=request.data)
+        if serializer.is_valid():
+            try:
+                process_approval(
+                    obj=user,
+                    content_type='user',
+                    status=serializer.validated_data['status'],
+                    reviewed_by=request.user,
+                    notes=serializer.validated_data.get('notes', '')
+                )
+                return Response(
+                    {"message": f"User {serializer.validated_data['status'].lower()} successfully"},
+                    status=status.HTTP_200_OK
+                )
+            except ValidationError as e:
+                return Response(
+                    {"error": str(e)}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class ProcessProductApprovalView(APIView):
+    """Process approval/rejection for a specific product"""
+    permission_classes = [IsAuthenticated, IsAdmin]
+
+    def post(self, request, product_id):
+        from .services.approval_services import process_approval
+        
+        try:
+            product = Product.objects.get(product_id=product_id)
+        except Product.DoesNotExist:
+            return Response(
+                {"error": "Product not found"}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        serializer = ProcessApprovalSerializer(data=request.data)
+        if serializer.is_valid():
+            try:
+                process_approval(
+                    obj=product,
+                    content_type='product',
+                    status=serializer.validated_data['status'],
+                    reviewed_by=request.user,
+                    notes=serializer.validated_data.get('notes', '')
+                )
+                return Response(
+                    {"message": f"Product {serializer.validated_data['status'].lower()} successfully"},
+                    status=status.HTTP_200_OK
+                )
+            except ValidationError as e:
+                return Response(
+                    {"error": str(e)}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class ApprovalHistoryView(APIView):
+    """Get approval history for a specific user or product"""
+    permission_classes = [IsAuthenticated, IsAdmin]
+
+    def get(self, request, content_type, object_id):
+        from .services.approval_services import get_approval_history
+        
+        if content_type == 'user':
+            try:
+                obj = User.objects.get(user_id=object_id)
+            except User.DoesNotExist:
+                return Response(
+                    {"error": "User not found"}, 
+                    status=status.HTTP_404_NOT_FOUND
+                )
+        elif content_type == 'product':
+            try:
+                obj = Product.objects.get(product_id=object_id)
+            except Product.DoesNotExist:
+                return Response(
+                    {"error": "Product not found"}, 
+                    status=status.HTTP_404_NOT_FOUND
+                )
+        else:
+            return Response(
+                {"error": "Invalid content type"}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        history = get_approval_history(obj, content_type)
+        serializer = ApprovalStatusSerializer(history, many=True)
+        return Response(serializer.data)
+
+
+class PendingUsersListView(generics.ListAPIView):
+    """List all users pending approval"""
+    serializer_class = UserSerializer
+    permission_classes = [IsAuthenticated, IsAdmin]
+    filter_backends = [SearchFilter, OrderingFilter]
+    search_fields = ['user_name', 'first_name', 'last_name', 'user_email']
+    ordering_fields = ['created_at', 'user_name', 'role']
+    ordering = ['-created_at']
+
+    def get_queryset(self):
+        return User.objects.filter(approval_status='PENDING')
+
+
+class PendingProductsListView(generics.ListAPIView):
+    """List all products pending approval"""
+    serializer_class = ProductSerializer
+    permission_classes = [IsAuthenticated, IsAdmin]
+    filter_backends = [SearchFilter, OrderingFilter, DjangoFilterBackend]
+    search_fields = ['product_name', 'seller_id__business_name']
+    ordering_fields = ['created_at', 'product_name', 'product_price']
+    ordering = ['-created_at']
+    filterset_fields = ['seller_id', 'sub_category_id']
+
+    def get_queryset(self):
+        return Product.objects.filter(approval_status='PENDING')
 

@@ -65,4 +65,12 @@ urlpatterns = [
 
     # ORDER ITEMS
     path("order-items/", views.OrderItemPostListCreate.as_view(), name="order-items"),
+
+    # APPROVAL MANAGEMENT
+    path("admin/approvals/", views.PendingApprovalsListView.as_view(), name="pending-approvals"),
+    path("admin/approvals/users/", views.PendingUsersListView.as_view(), name="pending-users"),
+    path("admin/approvals/products/", views.PendingProductsListView.as_view(), name="pending-products"),
+    path("admin/approvals/users/<uuid:user_id>/process/", views.ProcessUserApprovalView.as_view(), name="process-user-approval"),
+    path("admin/approvals/products/<str:product_id>/process/", views.ProcessProductApprovalView.as_view(), name="process-product-approval"),
+    path("admin/approvals/history/<str:content_type>/<str:object_id>/", views.ApprovalHistoryView.as_view(), name="approval-history"),
 ]
