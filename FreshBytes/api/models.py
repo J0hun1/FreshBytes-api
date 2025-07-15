@@ -73,6 +73,57 @@ class User(AbstractBaseUser, PermissionsMixin):
         # Ensure user_id is set (UUID will be generated automatically)
         self = validate_user_role(self)
         super().save(*args, **kwargs)
+    
+    # Group-based role checking methods (for new permission system)
+    def is_admin(self):
+        """Check if user is in Admin group or has admin role"""
+        return self.groups.filter(name='Admin').exists() or self.role == 'admin'
+    
+    def is_seller(self):
+        """Check if user is in Seller group or has seller role"""
+        return self.groups.filter(name='Seller').exists() or self.role == 'seller'
+    
+    def is_customer(self):
+        """Check if user is in Customer group or has customer role"""
+        return self.groups.filter(name='Customer').exists() or self.role == 'customer'
+    
+    def has_role(self, role_name):
+        """Check if user has a specific role (supports both groups and role field)"""
+        group_name = role_name.capitalize()
+        return (self.groups.filter(name=group_name).exists() or 
+                self.role == role_name.lower())
+    
+    def get_primary_role(self):
+        """Get the user's primary role based on group membership (falls back to role field)"""
+        if self.groups.filter(name='Admin').exists():
+            return 'admin'
+        elif self.groups.filter(name='Seller').exists():
+            return 'seller'
+        elif self.groups.filter(name='Customer').exists():
+            return 'customer'
+        else:
+            # Fallback to role field if no groups assigned
+            return self.role
+    
+    def sync_role_with_groups(self):
+        """Sync the role field with group membership (for backward compatibility)"""
+        primary_role = self.get_primary_role()
+        if self.role != primary_role:
+            self.role = primary_role
+            self.save(update_fields=['role'])
+    
+    def assign_to_group(self, group_name):
+        """Helper method to assign user to a specific group"""
+        from django.contrib.auth.models import Group
+        try:
+            group = Group.objects.get(name=group_name)
+            self.groups.add(group)
+            # Update role field to match
+            self.role = group_name.lower()
+            self.save(update_fields=['role'])
+            return True
+        except Group.DoesNotExist:
+            return False
 
     class Meta:
         verbose_name = 'User'
