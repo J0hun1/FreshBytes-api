@@ -1,38 +1,16 @@
 from django.db import models
+from django.contrib.postgres.fields import ArrayField
 from django.utils import timezone
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
 from django.contrib.auth.hashers import make_password
 from .services.product_services import update_seller_total_products
+from .services.promo_services import update_products_has_promo_on_promo_save, update_products_has_promo_on_promo_delete, update_products_has_promo_on_m2m_change
 from django.db.models.signals import pre_delete
+from .choices import ProductStatus, Discount_Type, OrderStatus
 import uuid
 from django.conf import settings
-
-# Add ApprovalStatus model for tracking approval history
-class ApprovalStatus(models.Model):
-    APPROVAL_CHOICES = [
-        ('PENDING', 'Pending Approval'),
-        ('APPROVED', 'Approved'),
-        ('REJECTED', 'Rejected'),
-    ]
-
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    content_type = models.CharField(max_length=50)  # 'user' or 'product'
-    object_id = models.CharField(max_length=255)  # UUID/ID of the user or product
-    status = models.CharField(max_length=20, choices=APPROVAL_CHOICES, default='PENDING')
-    notes = models.TextField(blank=True, null=True)
-    reviewed_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='approvals_made')
-    reviewed_at = models.DateTimeField(null=True, blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        db_table = 'ApprovalStatus'
-        indexes = [
-            models.Index(fields=['content_type', 'object_id']),
-            models.Index(fields=['status']),
-        ]
 
 class UserManager(BaseUserManager):
     def create_user(self, user_email, password=None, **extra_fields):
@@ -67,12 +45,6 @@ class User(AbstractBaseUser, PermissionsMixin):
         ('customer', 'Customer'),
     ]
 
-    APPROVAL_STATUS_CHOICES = [
-        ('PENDING', 'Pending Approval'),
-        ('APPROVED', 'Approved'),
-        ('REJECTED', 'Rejected'),
-    ]
-
     user_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False, unique=True)
     user_name = models.CharField(max_length=255)
     first_name = models.CharField(max_length=255)
@@ -82,7 +54,6 @@ class User(AbstractBaseUser, PermissionsMixin):
     user_phone = models.CharField(max_length=255)
     user_address = models.CharField(max_length=255)
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='customer')
-    approval_status = models.CharField(max_length=20, choices=APPROVAL_STATUS_CHOICES, default='PENDING')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
@@ -99,17 +70,9 @@ class User(AbstractBaseUser, PermissionsMixin):
     def save(self, *args, **kwargs):
         from .services.users_services import validate_user_role
         
-        # Auto-approve customers, but require approval for sellers
-        if self.role == 'customer' and self.approval_status == 'PENDING':
-            self.approval_status = 'APPROVED'
-        
         # Ensure user_id is set (UUID will be generated automatically)
         self = validate_user_role(self)
         super().save(*args, **kwargs)
-
-    @property
-    def is_approved(self):
-        return self.approval_status == 'APPROVED'
 
     class Meta:
         verbose_name = 'User'
@@ -194,12 +157,6 @@ class SubCategory(models.Model):
     
 #PRODUCT 
 class Product(models.Model):
-    APPROVAL_STATUS_CHOICES = [
-        ('PENDING', 'Pending Approval'),
-        ('APPROVED', 'Approved'),
-        ('REJECTED', 'Rejected'),
-    ]
-
     product_id = models.CharField(primary_key=True, max_length=36, unique=True, editable=False, default=uuid.uuid4)
     seller_id = models.ForeignKey(Seller, on_delete=models.CASCADE, null=True)
     product_name = models.CharField(max_length=255)
@@ -217,7 +174,6 @@ class Product(models.Model):
         ],
         default='FRESH'
     )
-    approval_status = models.CharField(max_length=20, choices=APPROVAL_STATUS_CHOICES, default='PENDING')
     product_location = models.CharField(max_length=255, null=True)
     sub_category_id = models.ForeignKey(SubCategory, on_delete=models.CASCADE, null=True)
     has_promo = models.BooleanField(default=False)
@@ -249,10 +205,6 @@ class Product(models.Model):
         if self.product_discountedPrice is not None:
             return self.product_price - self.product_discountedPrice
         return None
-
-    @property
-    def is_approved(self):
-        return self.approval_status == 'APPROVED'
 
     def update_discounted_price(self):
         if not self._skip_update and self.pk:  # Only update if product exists and not in recursive update

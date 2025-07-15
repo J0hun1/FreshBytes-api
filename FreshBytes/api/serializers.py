@@ -10,7 +10,6 @@ from .models import Cart
 from .models import CartItem
 from .models import Order
 from .models import OrderItem
-from .models import ApprovalStatus
 from django.contrib.auth import get_user_model
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from django.contrib.auth.hashers import make_password
@@ -37,16 +36,6 @@ class ProductSerializer(serializers.ModelSerializer):
         ],
         default='FRESH'
     )
-    approval_status = serializers.ChoiceField(
-        choices=[
-            ('PENDING', 'Pending Approval'),
-            ('APPROVED', 'Approved'),
-            ('REJECTED', 'Rejected'),
-        ],
-        default='PENDING',
-        read_only=True
-    )
-    is_approved = serializers.BooleanField(read_only=True)
     product_sku = serializers.CharField(required=False, allow_blank=True, allow_null=True, max_length=50)
 
     class Meta:
@@ -54,7 +43,7 @@ class ProductSerializer(serializers.ModelSerializer):
         fields = [
             "product_id", "user_id", "seller_id", "product_name", "product_price", 
             "product_brief_description", "product_full_description", "product_discountedPrice", 
-            "product_sku", "product_status", "approval_status", "is_approved", "product_location", "sub_category_id", 
+            "product_sku", "product_status", "product_location", "sub_category_id", 
             "category_id", "quantity", "post_date", "harvest_date", "is_active", 
             "review_count", "top_rated", "discounted_amount", "is_discounted", 
             "is_srp", "is_deleted", "sell_count", "created_at", "updated_at", "has_promo"
@@ -101,23 +90,13 @@ class SubCategorySerializer(serializers.ModelSerializer):
 class UserSerializer(serializers.ModelSerializer):
     # Password is optional for updates, required for user creation.
     password = serializers.CharField(write_only=True, required=False, allow_blank=False)
-    approval_status = serializers.ChoiceField(
-        choices=[
-            ('PENDING', 'Pending Approval'),
-            ('APPROVED', 'Approved'),
-            ('REJECTED', 'Rejected'),
-        ],
-        default='PENDING',
-        read_only=True
-    )
-    is_approved = serializers.BooleanField(read_only=True)
 
     class Meta:
         model = User
         fields = ['user_id', 'user_name', 'first_name', 'last_name', 'user_email', 
-                 'password', 'user_phone', 'user_address', 'role', 'approval_status', 'is_approved',
-                 'created_at', 'updated_at', 'is_active', 'is_deleted', 'is_superuser']
-        read_only_fields = ['user_id', 'created_at', 'updated_at', 'approval_status', 'is_approved']
+                 'password', 'user_phone', 'user_address', 'role', 'created_at', 
+                 'updated_at', 'is_active', 'is_deleted', 'is_superuser']
+        read_only_fields = ['user_id', 'created_at', 'updated_at']
         extra_kwargs = {
             'password': {'write_only': True}
         }
@@ -230,28 +209,3 @@ class OrderItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = OrderItem
         fields = ["order_item_id", "order_id", "product_id", "quantity", "total_item_price", "discount_amount", "created_at", "updated_at"]
-
-# Approval Status Serializers
-class ApprovalStatusSerializer(serializers.ModelSerializer):
-    reviewed_by_name = serializers.CharField(source='reviewed_by.user_name', read_only=True)
-    
-    class Meta:
-        model = ApprovalStatus
-        fields = ['id', 'content_type', 'object_id', 'status', 'notes', 
-                 'reviewed_by', 'reviewed_by_name', 'reviewed_at', 'created_at', 'updated_at']
-        read_only_fields = ['id', 'created_at', 'updated_at', 'reviewed_by_name']
-
-class ProcessApprovalSerializer(serializers.Serializer):
-    status = serializers.ChoiceField(
-        choices=[('APPROVED', 'Approved'), ('REJECTED', 'Rejected')],
-        required=True
-    )
-    notes = serializers.CharField(max_length=1000, required=False, allow_blank=True)
-
-class PendingApprovalSerializer(serializers.Serializer):
-    """Serializer for pending approval items with basic info"""
-    object_id = serializers.CharField()
-    content_type = serializers.CharField()
-    created_at = serializers.DateTimeField()
-    object_name = serializers.CharField()  # Will be populated in views
-    object_details = serializers.DictField()  # Will contain relevant object info
