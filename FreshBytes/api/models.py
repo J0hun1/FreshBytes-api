@@ -5,6 +5,7 @@ from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
 from django.contrib.auth.hashers import make_password
+from django.core.validators import MinValueValidator, MaxValueValidator
 from .services.product_services import update_seller_total_products
 from .services.promo_services import update_products_has_promo_on_promo_save, update_products_has_promo_on_promo_delete, update_products_has_promo_on_m2m_change
 from django.db.models.signals import pre_delete
@@ -14,14 +15,19 @@ from django.conf import settings
 
 class UserManager(BaseUserManager):
     def create_user(self, user_email, password=None, **extra_fields):
+        """Create and save a user with a valid password.
+
+        Security fix: a password **must** be provided. Removes the default
+        plaintext password that previously existed.
+        """
         if not user_email:
             raise ValueError('The Email field must be set')
+        if not password:
+            raise ValueError('Password must be provided')
+
         user_email = self.normalize_email(user_email)
         user = self.model(user_email=user_email, **extra_fields)
-        if password:
-            user.set_password(password)
-        else:
-            user.set_password('defaultpassword123')
+        user.set_password(password)
         user.save(using=self._db)
         return user
 
@@ -211,7 +217,8 @@ class Product(models.Model):
     product_id = models.CharField(primary_key=True, max_length=36, unique=True, editable=False, default=uuid.uuid4)
     seller_id = models.ForeignKey(Seller, on_delete=models.CASCADE, null=True)
     product_name = models.CharField(max_length=255)
-    product_price = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    product_price = models.DecimalField(max_digits=10, decimal_places=2, default=0,
+                                        validators=[MinValueValidator(0.01)])
     product_brief_description = models.CharField(max_length=255)
     product_full_description = models.CharField(max_length=255)
     product_discountedPrice = models.DecimalField(max_digits=10, decimal_places=2, null=True)
@@ -228,8 +235,9 @@ class Product(models.Model):
     product_location = models.CharField(max_length=255, null=True)
     sub_category_id = models.ForeignKey(SubCategory, on_delete=models.CASCADE, null=True)
     has_promo = models.BooleanField(default=False)
-    weight = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    quantity = models.IntegerField(default=1)
+    weight = models.DecimalField(max_digits=10, decimal_places=2, default=0,
+                                 validators=[MinValueValidator(0.01)])
+    quantity = models.IntegerField(default=1, validators=[MinValueValidator(0)])
     post_date = models.DateTimeField(default=timezone.now)
     harvest_date = models.DateTimeField(null=True)
     is_active = models.BooleanField(default=True)
@@ -312,7 +320,8 @@ class Reviews(models.Model):
     review_id = models.CharField(primary_key=True, max_length=10, unique=True, editable=False)
     user_id = models.ForeignKey(User, on_delete=models.CASCADE, null=True, db_column='user_id')
     product_id = models.ForeignKey(Product, on_delete=models.CASCADE, null=True)
-    review_rating = models.IntegerField(default=0)
+    review_rating = models.IntegerField(default=0,
+                                       validators=[MinValueValidator(1), MaxValueValidator(5)])
     review_comment = models.CharField(max_length=255)
     review_date = models.DateTimeField(auto_now_add=True)
     created_at = models.DateTimeField(auto_now_add=True)

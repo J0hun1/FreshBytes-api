@@ -9,6 +9,10 @@ urlpatterns = [
     path("auth/register/", views.RegisterView.as_view(), name="auth_register"),
     path("auth/logout/", views.LogoutView.as_view(), name="auth_logout"),
     path("auth/test/", views.TestAuthView.as_view(), name="test_auth"),
+    
+    # Permission checking endpoints
+    path("auth/permissions/", views.UserPermissionsView.as_view(), name="user_permissions"),
+    path("auth/check-roles/", views.UserRoleCheckView.as_view(), name="check_roles"),
 
     # PRODUCTS 
     path("products/", views.ProductPostListCreate.as_view(), name="products"),

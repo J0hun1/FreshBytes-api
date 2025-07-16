@@ -18,6 +18,7 @@ from .services.cart_services import get_or_create_cart, add_to_cart, update_cart
 from django.core.exceptions import ValidationError
 from rest_framework.decorators import action
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 
 # Custom permission classes
 class IsAdmin(BasePermission):
@@ -645,4 +646,109 @@ class DeletedUserRetrieveDestroy(generics.RetrieveDestroyAPIView):
 
     def get_queryset(self):
         return User.objects.filter(is_deleted=True)
+
+
+# Add permission checking endpoint
+class UserPermissionsView(APIView):
+    """
+    Endpoint to check user permissions and roles.
+    Useful for frontend to dynamically show/hide features.
+    """
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        """Get current user's permissions and role information"""
+        user = request.user
+        
+        # Get all user permissions
+        user_permissions = list(user.get_all_permissions())
+        
+        # Get group-based permissions
+        group_permissions = []
+        for group in user.groups.all():
+            group_permissions.extend([
+                f"{perm.content_type.app_label}.{perm.codename}" 
+                for perm in group.permissions.all()
+            ])
+        
+        return Response({
+            'user_id': str(user.user_id),
+            'email': user.user_email,
+            'role': user.role,
+            'primary_role': user.get_primary_role(),
+            'groups': [group.name for group in user.groups.all()],
+            'permissions': {
+                'all_permissions': user_permissions,
+                'group_permissions': list(set(group_permissions)),
+                'role_checks': {
+                    'is_admin': user.is_admin(),
+                    'is_seller': user.is_seller(),
+                    'is_customer': user.is_customer(),
+                },
+                'specific_permissions': {
+                    'can_add_product': user.has_perm('api.add_product'),
+                    'can_change_product': user.has_perm('api.change_product'),
+                    'can_delete_product': user.has_perm('api.delete_product'),
+                    'can_approve_products': user.has_perm('api.can_approve_products'),
+                    'can_feature_products': user.has_perm('api.can_feature_products'),
+                    'can_view_seller_stats': user.has_perm('api.can_view_seller_stats'),
+                    'can_manage_sellers': user.has_perm('api.can_manage_sellers'),
+                    'can_moderate_reviews': user.has_perm('api.can_moderate_reviews'),
+                    'can_view_all_orders': user.has_perm('api.can_view_all_orders'),
+                }
+            }
+        })
+    
+    def post(self, request):
+        """Check if user has a specific permission"""
+        permission = request.data.get('permission')
+        
+        if not permission:
+            return Response(
+                {'error': 'Permission parameter is required'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Handle both formats: 'api.add_product' or 'add_product'
+        if '.' not in permission:
+            permission = f'api.{permission}'
+        
+        has_permission = request.user.has_perm(permission)
+        
+        return Response({
+            'permission': permission,
+            'has_permission': has_permission,
+            'user_id': str(request.user.user_id),
+            'checked_at': timezone.now().isoformat()
+        })
+
+
+class UserRoleCheckView(APIView):
+    """
+    Endpoint to check if user has specific roles.
+    Supports both old role field and new group-based checking.
+    """
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request):
+        """Check if user has any of the specified roles"""
+        roles = request.data.get('roles', [])
+        
+        if not isinstance(roles, list):
+            roles = [roles]
+        
+        user = request.user
+        role_results = {}
+        
+        for role in roles:
+            role_results[role] = user.has_role(role)
+        
+        return Response({
+            'user_id': str(user.user_id),
+            'current_role': user.role,
+            'primary_role': user.get_primary_role(),
+            'groups': [group.name for group in user.groups.all()],
+            'role_checks': role_results,
+            'has_any_role': any(role_results.values())
+        })
 
