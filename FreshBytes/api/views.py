@@ -19,6 +19,10 @@ from django.core.exceptions import ValidationError
 from rest_framework.decorators import action
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
+from .models import Payment
+from .serializers import PaymentSerializer
+from rest_framework import generics
+from rest_framework.permissions import IsAuthenticated
 
 # Custom permission classes
 class IsAdmin(BasePermission):
@@ -752,3 +756,14 @@ class UserRoleCheckView(APIView):
             'has_any_role': any(role_results.values())
         })
 
+
+class PaymentCreateView(generics.CreateAPIView):
+    queryset = Payment.objects.all()
+    serializer_class = PaymentSerializer
+    permission_classes = [IsAuthenticated]
+
+class PaymentDetailView(generics.RetrieveAPIView):
+    queryset = Payment.objects.all()
+    serializer_class = PaymentSerializer
+    permission_classes = [IsAuthenticated]
+    lookup_field = 'payment_id'

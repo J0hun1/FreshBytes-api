@@ -69,4 +69,8 @@ urlpatterns = [
 
     # ORDER ITEMS
     path("order-items/", views.OrderItemPostListCreate.as_view(), name="order-items"),
+
+    # PAYMENTS
+    path("payments/", views.PaymentCreateView.as_view(), name="payment-create"),
+    path("payments/<str:payment_id>/", views.PaymentDetailView.as_view(), name="payment-detail"),
 ]

@@ -35,64 +35,45 @@ notes:
 
 
 
-api/users/
-    {
-        "user_id": "uid00125",
-        "user_name": "admin",
-        "first_name": "admin",
-        "last_name": "admin",
-        "user_email": "admin@gmail.com",
-        "user_phone": "012346789432",
-        "user_address": "Poblacion Kabacan, Cotabato",
-        "role": "admin",
-        "created_at": "2025-07-03T14:09:51.986635+08:00",
-        "updated_at": "2025-07-03T14:17:17.076130+08:00",
-        "is_active": true,
-        "is_deleted": false,
-        "is_admin": true,
-        "is_superuser": true
-    },
-    {
-        "user_id": "uid00325",
-        "user_name": "EJ",
-        "first_name": "EJ faye",
-        "last_name": "Dulay",
-        "user_email": "ej@gmail.com",
-        "user_phone": "012346789432",
-        "user_address": "Poblacion Kabacan, Cotabato",
-        "role": "customer",
-        "created_at": "2025-07-03T14:45:13.675885+08:00",
-        "updated_at": "2025-07-03T14:45:13.675899+08:00",
-        "is_active": true,
-        "is_deleted": false,
-        "is_admin": false,
-        "is_superuser": false
-    }   
+TODOS:
+1. Design the Missing Models
+    A. Payment Model
+        Purpose: Track all payment transactions for orders.
+        Fields: payment_id, order (FK), method, status, amount, transaction_id, payment_date, etc.
+        Best Practice: Use enums for status/method, store gateway responses, and link to orders.
+    B. Inventory Model
+        Purpose: Track stock for each product, prevent overselling.
+        Fields: product (OneToOne), current_stock, reserved_stock, available_stock, low_stock_threshold, last_restocked.
+        Best Practice: Use atomic updates for stock changes, and log all movements.
+    C. Shipping/Address Models
+        Purpose: Store user addresses and shipping details for orders.
+        Fields: user (FK), address fields, is_default, etc.
+        Best Practice: Allow multiple addresses per user, and link shipping to orders.
+    D. Notification Model
+        Purpose: Notify users of order status, low stock, etc.
+        Fields: user (FK), type, title, message, is_read, created_at.
+        Best Practice: Use a service layer to trigger notifications on key events.
 
-api/auth/login/
-{
-    "user_email": "admin@gmail.com",
-    "password": "admin"
-}
+2. Implement Business Logic Services
+    Create a services/ module for each domain:
+    payment_services.py (handle payment processing, refunds)
+    inventory_services.py (stock reservation, release, audit)
+    order_services.py (order creation, status transitions, total calculation)
+    shipping_services.py (cost calculation, address validation)
+    notification_services.py (send notifications on events)
+    Use Django transactions for all workflows that touch multiple models (e.g., order creation, payment, inventory).
 
+3. Add Validation and State Machines
+    Order Status:
+        Implement a state machine for order status transitions (e.g., PENDING → CONFIRMED → SHIPPED → DELIVERED).
+    Promo Validation:
+        Ensure discounts are valid (e.g., percentage ≤ 100, fixed > 0, end date > start date).
+    Cart/Inventory:
+        Validate stock before adding to cart or confirming order.
 
-api/products/
-{
-    "seller_id": "sid00125",
-    "product_name": "Fresh Tomatoes",
-    "product_price": 99.99,
-    "product_brief_description": "Fresh farm tomatoes",
-    "product_full_description": "Organically grown fresh tomatoes from our local farm",
-    "product_discountedPrice": 79.99,
-    "product_sku": "TOM001",
-    "product_status": "FRESH",
-    "product_location": "Farm Location",
-    "sub_category_id": "subid00125",
-    "weight": 1.5,
-    "quantity": 100,
-    "post_date": "2024-03-20T10:00:00Z",
-    "harvest_date": "2024-03-20T10:00:00Z",
-    "is_active": true,
-    "offer_start_date": "2024-03-20T10:00:00Z",
-    "offer_end_date": "2024-03-27T10:00:00Z"
-}
+4. Integrate With Views/Serializers
+    Serializers:
+        Add validation logic in DRF serializers for all new models.
+    Views:
+        Use service functions in your API views to encapsulate business logic (not in the view directly).
+

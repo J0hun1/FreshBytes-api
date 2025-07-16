@@ -10,6 +10,7 @@ from .models import Cart
 from .models import CartItem
 from .models import Order
 from .models import OrderItem
+from .models import Payment
 from django.contrib.auth import get_user_model
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from django.contrib.auth.hashers import make_password
@@ -225,3 +226,10 @@ class OrderItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = OrderItem
         fields = ["order_item_id", "order_id", "product_id", "quantity", "total_item_price", "discount_amount", "created_at", "updated_at"]
+
+
+class PaymentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Payment
+        fields = '__all__'
+        read_only_fields = ['payment_id', 'created_at', 'updated_at', 'payment_date']
