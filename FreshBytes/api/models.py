@@ -434,7 +434,7 @@ def handle_promo_m2m_changes(sender, instance, action, pk_set, **kwargs):
 
 #CART
 class Cart(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    cart_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
@@ -447,7 +447,7 @@ class Cart(models.Model):
         db_table = 'Cart'
 
 class CartItem(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    cart_item_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     cart = models.ForeignKey(
         Cart, 
         on_delete=models.CASCADE,

@@ -185,7 +185,7 @@ class CartItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = CartItem
         fields = [
-            'id', 'cart', 'product', 'quantity', 
+            'cart_id', 'cart_item_id', 'product', 'quantity', 
             'unit_price', 'total_price', 
             'created_at', 'updated_at'
         ]
@@ -207,8 +207,8 @@ class CartSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Cart
-        fields = ['id', 'user', 'items', 'total_items', 'total_amount', 'created_at', 'updated_at']
-        read_only_fields = ['id', 'created_at', 'updated_at']
+        fields = ['cart_id', 'user', 'items', 'total_items', 'total_amount', 'created_at', 'updated_at']
+        read_only_fields = ['cart_id', 'created_at', 'updated_at']
 
     def to_representation(self, instance):
         data = super().to_representation(instance)

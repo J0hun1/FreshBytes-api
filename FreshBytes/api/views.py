@@ -23,6 +23,8 @@ from .models import Payment
 from .serializers import PaymentSerializer
 from rest_framework import generics
 from rest_framework.permissions import IsAuthenticated
+from .services.order_services import create_order_from_cart
+from .serializers import OrderSerializer
 
 # Custom permission classes
 class IsAdmin(BasePermission):
@@ -767,3 +769,14 @@ class PaymentDetailView(generics.RetrieveAPIView):
     serializer_class = PaymentSerializer
     permission_classes = [IsAuthenticated]
     lookup_field = 'payment_id'
+
+class OrderCheckoutView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        cart_item_ids = request.data.get('cart_item_ids', None)
+        try:
+            order = create_order_from_cart(request.user, cart_item_ids)
+            return Response(OrderSerializer(order).data, status=status.HTTP_201_CREATED)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)

@@ -65,6 +65,7 @@ urlpatterns = [
 
     # ORDERS 
     path("orders/", views.OrderPostListCreate.as_view(), name="orders"),
+    path("orders/checkout/", views.OrderCheckoutView.as_view(), name="order-checkout"),
     path("orders/<str:pk>/", views.OrderPostRetrieveUpdateDestroy.as_view(), name="order-detail"),
 
     # ORDER ITEMS

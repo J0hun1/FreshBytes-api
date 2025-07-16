@@ -36,3 +36,14 @@ def initialize_seller_stats(seller):
     seller.total_followers = seller.total_followers or 0
     seller.total_likes = seller.total_likes or 0
     seller.total_products_sold = seller.total_products_sold or 0
+
+def update_seller_total_orders(seller):
+    """
+    Recalculates and updates the total_orders count for a given seller.
+    """
+    from ..models import OrderItem
+    order_ids = OrderItem.objects.filter(
+        product_id__seller_id=seller
+    ).values_list('order_id', flat=True).distinct()
+    seller.total_orders = len(order_ids)
+    seller.save(update_fields=['total_orders'])
