@@ -780,3 +780,45 @@ class OrderCheckoutView(APIView):
             return Response(OrderSerializer(order).data, status=status.HTTP_201_CREATED)
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+class OrderStatusUpdateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, order_id):
+        try:
+            order = Order.objects.get(order_id=order_id)
+        except Order.DoesNotExist:
+            return Response({'error': 'Order not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        user = request.user
+        # Allow: admin, order owner, or seller of any product in the order
+        is_admin = user.is_admin() if hasattr(user, 'is_admin') else (user.role == 'admin')
+        is_order_owner = (order.user_id == user)
+        # Check if user is a seller for any product in the order
+        is_seller = False
+        if hasattr(user, 'seller_profile'):
+            seller = user.seller_profile
+            from .models import OrderItem
+            is_seller = OrderItem.objects.filter(order_id=order, product_id__seller_id=seller).exists()
+
+        new_status = request.data.get('order_status')
+        allowed_statuses = [choice[0] for choice in Order._meta.get_field('order_status').choices]
+        if new_status not in allowed_statuses:
+            return Response({'error': f'Invalid status. Allowed: {allowed_statuses}'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Special case: allow customer to cancel their own order if it's still PENDING
+        if is_order_owner and new_status == 'CANCELLED':
+            if order.order_status == 'PENDING':
+                order.order_status = 'CANCELLED'
+                order.save(update_fields=['order_status', 'updated_at'])
+                return Response(OrderSerializer(order).data, status=status.HTTP_200_OK)
+            else:
+                return Response({'error': 'You can only cancel orders that are still PENDING.'}, status=status.HTTP_403_FORBIDDEN)
+
+        # Otherwise, only admin or seller can update status
+        if not (is_admin or is_seller):
+            return Response({'error': 'Permission denied.'}, status=status.HTTP_403_FORBIDDEN)
+
+        order.order_status = new_status
+        order.save(update_fields=['order_status', 'updated_at'])
+        return Response(OrderSerializer(order).data, status=status.HTTP_200_OK)

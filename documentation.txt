@@ -41,6 +41,13 @@ TODOS:
         Purpose: Track all payment transactions for orders.
         Fields: payment_id, order (FK), method, status, amount, transaction_id, payment_date, etc.
         Best Practice: Use enums for status/method, store gateway responses, and link to orders.
+
+        1. Order status update endpoints (for seller and system).
+        2. Notification system (email, dashboard, etc.).
+        3. Shipping/tracking integration (optional).
+        4. Review/feedback system (optional).
+        5. Seller earnings and payout logic (optional).
+
     B. Inventory Model
         Purpose: Track stock for each product, prevent overselling.
         Fields: product (OneToOne), current_stock, reserved_stock, available_stock, low_stock_threshold, last_restocked.
