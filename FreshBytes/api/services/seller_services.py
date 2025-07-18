@@ -83,3 +83,15 @@ def update_seller_stats_on_order_delivered(order):
             seller.total_orders = total_orders
             seller.total_products_sold = total_products_sold
             seller.save(update_fields=['total_earnings', 'total_orders', 'total_products_sold'])
+
+            # Update product sell_count
+            from django.db import models
+            for item in delivered_items:
+                product = item.product_id
+                # Calculate total sold for this product across all delivered orders
+                total_sold = OrderItem.objects.filter(
+                    product_id=product,
+                    order_id__order_status='DELIVERED'
+                ).aggregate(total=models.Sum('quantity'))['total'] or 0
+                product.sell_count = total_sold
+                product.save(update_fields=['sell_count'])
