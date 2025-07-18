@@ -24,6 +24,7 @@ from .serializers import PaymentSerializer
 from rest_framework import generics
 from rest_framework.permissions import IsAuthenticated
 from .services.order_services import create_order_from_cart
+from .services.seller_services import update_seller_stats_on_order_delivered
 from .serializers import OrderSerializer
 
 # Custom permission classes
@@ -819,6 +820,12 @@ class OrderStatusUpdateView(APIView):
         if not (is_admin or is_seller):
             return Response({'error': 'Permission denied.'}, status=status.HTTP_403_FORBIDDEN)
 
+        old_status = order.order_status
         order.order_status = new_status
         order.save(update_fields=['order_status', 'updated_at'])
+
+        if old_status != 'DELIVERED' and new_status == 'DELIVERED':
+            print("Calling update_seller_stats_on_order_delivered (test)", flush=True)
+            update_seller_stats_on_order_delivered(order)
+
         return Response(OrderSerializer(order).data, status=status.HTTP_200_OK)

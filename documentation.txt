@@ -42,7 +42,7 @@ TODOS:
         Fields: payment_id, order (FK), method, status, amount, transaction_id, payment_date, etc.
         Best Practice: Use enums for status/method, store gateway responses, and link to orders.
 
-        1. Order status update endpoints (for seller and system).
+        1. Order status update endpoints (for seller and system). ✅
         2. Notification system (email, dashboard, etc.).
         3. Shipping/tracking integration (optional).
         4. Review/feedback system (optional).

@@ -47,3 +47,39 @@ def update_seller_total_orders(seller):
     ).values_list('order_id', flat=True).distinct()
     seller.total_orders = len(order_ids)
     seller.save(update_fields=['total_orders'])
+
+
+def update_seller_stats_on_order_delivered(order):
+    """
+    Update seller statistics when an order is marked as delivered.
+    This recalculates total_earnings, total_orders, and total_products_sold
+    for all sellers involved in the delivered order.
+    """
+    print("Updating seller stats for order:", order.order_id, flush=True)
+    from ..models import OrderItem, Seller
+    
+    # Get all unique sellers involved in this order
+    seller_ids = OrderItem.objects.filter(
+        order_id=order
+    ).values_list('product_id__seller_id', flat=True).distinct()
+    
+    for seller_id in seller_ids:
+        if seller_id:  # Make sure seller_id is not None
+            seller = Seller.objects.get(pk=seller_id)
+            
+            # Get all delivered order items for this seller
+            delivered_items = OrderItem.objects.filter(
+                product_id__seller_id=seller,
+                order_id__order_status='DELIVERED'
+            )
+            
+            # Calculate new stats
+            total_earnings = sum(item.total_item_price for item in delivered_items)
+            total_orders = delivered_items.values('order_id').distinct().count()
+            total_products_sold = sum(item.quantity for item in delivered_items)
+            
+            # Update seller stats
+            seller.total_earnings = total_earnings
+            seller.total_orders = total_orders
+            seller.total_products_sold = total_products_sold
+            seller.save(update_fields=['total_earnings', 'total_orders', 'total_products_sold'])
