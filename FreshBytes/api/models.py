@@ -172,6 +172,39 @@ class Seller(models.Model):
             
         super().save(*args, **kwargs)
 
+    def get_customers(self):
+        """
+        Returns a queryset of unique customers who have bought from this seller.
+        """
+        from .models import OrderItem
+        customer_ids = OrderItem.objects.filter(
+            product_id__seller_id=self,
+            order_id__order_status='DELIVERED'
+        ).values_list('order_id__user_id', flat=True).distinct()
+        return User.objects.filter(user_id__in=customer_ids)
+
+    def get_transactions(self):
+        """
+        Returns a queryset of all orders (transactions) involving this seller.
+        """
+        from .models import OrderItem, Order
+        order_ids = OrderItem.objects.filter(
+            product_id__seller_id=self
+        ).values_list('order_id', flat=True).distinct()
+        return Order.objects.filter(id__in=order_ids)
+
+    def get_products_bought_by_customer(self, customer):
+        """
+        Returns a queryset of products bought by a specific customer from this seller.
+        """
+        from .models import OrderItem, Product
+        product_ids = OrderItem.objects.filter(
+            product_id__seller_id=self,
+            order_id__user_id=customer,
+            order_id__order_status='DELIVERED'
+        ).values_list('product_id', flat=True).distinct()
+        return Product.objects.filter(product_id__in=product_ids)
+
     class Meta:
         db_table = 'Seller'
 
@@ -483,23 +516,11 @@ class CartItem(models.Model):
 
 #ORDER
 class Order(models.Model):
-    order_id = models.CharField(primary_key=True, max_length=10, unique=True, editable=False)
-    
-    def save(self, *args, **kwargs):
-        if not self.order_id:
-            last_order = Order.objects.order_by('-created_at').first()
-            if last_order:
-                last_id = int(last_order.order_id[7:10])  # Extract the numeric part after 'orderid'
-                new_id = f"oid{last_id + 1:03d}25"
-            else:
-                new_id = "oid00125"
-            self.order_id = new_id
-        super().save(*args, **kwargs)
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    order_number = models.CharField(max_length=20, unique=True, editable=False)
     user_id = models.ForeignKey(User, on_delete=models.CASCADE, null=True, db_column='user_id')
     order_date = models.DateTimeField(auto_now_add=True)
     order_total = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    discount_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    discount_percentage = models.IntegerField(default=0)
     order_status = models.CharField(
         max_length=255,
         choices=[
@@ -512,9 +533,26 @@ class Order(models.Model):
         ],
         default='PENDING'
     )
+    is_archived = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    
+
+    def save(self, *args, **kwargs):
+        if not self.order_number:
+            from datetime import datetime
+            year = datetime.now().year
+            last_order = Order.objects.filter(order_number__startswith=f'OID-{year}').order_by('-created_at').first()
+            if last_order and last_order.order_number:
+                try:
+                    last_num = int(last_order.order_number.split('-')[-1])
+                except Exception:
+                    last_num = 0
+                new_num = last_num + 1
+            else:
+                new_num = 1
+            self.order_number = f'OID-{year}-{new_num:05d}'
+        super().save(*args, **kwargs)
+
     class Meta:
         db_table = 'Orders'
 
@@ -522,11 +560,10 @@ class Order(models.Model):
 #ORDER ITEMS
 class OrderItem(models.Model):
     order_item_id = models.CharField(primary_key=True, max_length=10, unique=True, editable=False)
-    order_id = models.ForeignKey(Order, on_delete=models.CASCADE, null=True)
+    order_id = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='order_items')
     product_id = models.ForeignKey(Product, on_delete=models.CASCADE, null=True)
     quantity = models.IntegerField(default=1)
     total_item_price = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    discount_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
@@ -560,7 +597,7 @@ class Payment(models.Model):
         ('REFUNDED', 'Refunded'),
     ]
     payment_id = models.CharField(primary_key=True, max_length=12, unique=True, editable=False)
-    order = models.OneToOneField('Order', on_delete=models.CASCADE, related_name='payment')
+    order = models.OneToOneField(Order, on_delete=models.CASCADE, related_name='payment')
     payment_method = models.CharField(max_length=20, choices=PAYMENT_METHODS)
     payment_status = models.CharField(max_length=20, choices=PAYMENT_STATUS, default='PENDING')
     amount = models.DecimalField(max_digits=10, decimal_places=2)
@@ -570,4 +607,4 @@ class Payment(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f"{self.payment_id} - {self.order.order_id} - {self.payment_status}"
+        return f"{self.payment_id} - {self.order.order_number} - {self.payment_status}"

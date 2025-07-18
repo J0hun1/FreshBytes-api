@@ -220,12 +220,16 @@ class CartSerializer(serializers.ModelSerializer):
 class OrderSerializer(serializers.ModelSerializer):
     class Meta:
         model = Order
-        fields = ["order_id", "user_id", "order_date", "order_total", "discount_amount", "discount_percentage", "order_status", "created_at", "updated_at"]
+        fields = [
+            "order_id", "user_id", "order_date", "order_total", "order_status", "created_at", "updated_at", "order_number"
+        ]
 
 class OrderItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = OrderItem
-        fields = ["order_item_id", "order_id", "product_id", "quantity", "total_item_price", "discount_amount", "created_at", "updated_at"]
+        fields = [
+            "order_item_id", "order_id", "product_id", "quantity", "total_item_price", "created_at", "updated_at"
+        ]
 
 
 class PaymentSerializer(serializers.ModelSerializer):

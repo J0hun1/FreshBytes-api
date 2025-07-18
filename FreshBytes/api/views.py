@@ -26,6 +26,8 @@ from rest_framework.permissions import IsAuthenticated
 from .services.order_services import create_order_from_cart
 from .services.seller_services import update_seller_stats_on_order_delivered
 from .serializers import OrderSerializer
+from .models import Order
+from .serializers import OrderSerializer
 
 # Custom permission classes
 class IsAdmin(BasePermission):
@@ -829,3 +831,55 @@ class OrderStatusUpdateView(APIView):
             update_seller_stats_on_order_delivered(order)
 
         return Response(OrderSerializer(order).data, status=status.HTTP_200_OK)
+
+class OrderArchiveView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, order_id):
+        try:
+            order = Order.objects.get(pk=order_id)
+        except Order.DoesNotExist:
+            return Response({'error': 'Order not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        user = request.user
+        is_admin = user.is_admin() if hasattr(user, 'is_admin') else (user.role == 'admin')
+        is_order_owner = (order.user_id == user)
+        if not (is_admin or is_order_owner):
+            return Response({'error': 'Permission denied.'}, status=status.HTTP_403_FORBIDDEN)
+
+        is_archived = request.data.get('is_archived')
+        if is_archived is None:
+            return Response({'error': 'is_archived field is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        order.is_archived = bool(is_archived)
+        order.save(update_fields=['is_archived', 'updated_at'])
+        return Response(OrderSerializer(order).data, status=status.HTTP_200_OK)
+
+class SellerCustomersView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, seller_id):
+        seller = Seller.objects.get(pk=seller_id)
+        customers = seller.get_customers()
+        data = UserSerializer(customers, many=True).data
+        return Response(data)
+
+class SellerTransactionsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, seller_id):
+        seller = Seller.objects.get(pk=seller_id)
+        transactions = seller.get_transactions()
+        data = OrderSerializer(transactions, many=True).data
+        return Response(data)
+
+from .serializers import ProductSerializer
+
+class SellerProductsBoughtByCustomerView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, seller_id, customer_id):
+        seller = Seller.objects.get(pk=seller_id)
+        products = seller.get_products_bought_by_customer(customer_id)
+        data = ProductSerializer(products, many=True).data
+        return Response(data)
