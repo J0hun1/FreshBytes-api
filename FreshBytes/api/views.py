@@ -526,8 +526,6 @@ class PromoPostRetrieveUpdateDestroy(generics.RetrieveUpdateDestroyAPIView):
 
 #CART
 
-
-
 class CartViewSet(viewsets.ViewSet):
     permission_classes = [IsAuthenticated]
     serializer_class = CartSerializer
@@ -854,6 +852,20 @@ class OrderArchiveView(APIView):
         order.is_archived = bool(is_archived)
         order.save(update_fields=['is_archived', 'updated_at'])
         return Response(OrderSerializer(order).data, status=status.HTTP_200_OK)
+    
+class OrderDetailView(generics.RetrieveUpdateDestroyAPIView):
+    queryset = Order.objects.all()
+    serializer_class = OrderSerializer
+    lookup_field = 'order_id'  # Use UUID
+
+    # Optional: allow lookup by order_number
+    def get_object(self):
+        order_number = self.kwargs.get('order_number')
+        if order_number:
+            return Order.objects.get(order_number=order_number)
+        return super().get_object()
+
+
 
 class SellerCustomersView(APIView):
     permission_classes = [IsAuthenticated]
@@ -883,3 +895,40 @@ class SellerProductsBoughtByCustomerView(APIView):
         products = seller.get_products_bought_by_customer(customer_id)
         data = ProductSerializer(products, many=True).data
         return Response(data)
+
+class ProductSoftDeleteView(APIView):
+    def patch(self, request, product_id):
+        try:
+            product = Product.all_objects.get(product_id=product_id)
+            if product.is_deleted:
+                return Response({'detail': 'Product already deleted.'}, status=status.HTTP_400_BAD_REQUEST)
+            product.is_deleted = True
+            product.save()
+            return Response({'detail': 'Product soft-deleted.'}, status=status.HTTP_200_OK)
+        except Product.DoesNotExist:
+            return Response({'detail': 'Product not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+class ProductRestoreView(APIView):
+    def patch(self, request, product_id):
+        try:
+            product = Product.all_objects.get(product_id=product_id)
+            if not product.is_deleted:
+                return Response({'detail': 'Product is not deleted.'}, status=status.HTTP_400_BAD_REQUEST)
+            product.is_deleted = False
+            product.save()
+            return Response({'detail': 'Product restored.'}, status=status.HTTP_200_OK)
+        except Product.DoesNotExist:
+            return Response({'detail': 'Product not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+class DeletedProductListView(APIView):
+    def get(self, request):
+        deleted_products = Product.all_objects.filter(is_deleted=True)
+        # You may want to use a serializer here for full details
+        data = [
+            {
+                'product_id': p.product_id,
+                'product_name': p.product_name,
+                'is_deleted': p.is_deleted
+            } for p in deleted_products
+        ]
+        return Response(data, status=status.HTTP_200_OK)

@@ -191,7 +191,7 @@ class Seller(models.Model):
         order_ids = OrderItem.objects.filter(
             product_id__seller_id=self
         ).values_list('order_id', flat=True).distinct()
-        return Order.objects.filter(id__in=order_ids)
+        return Order.objects.filter(order_id__in=order_ids)
 
     def get_products_bought_by_customer(self, customer):
         """
@@ -204,6 +204,7 @@ class Seller(models.Model):
             order_id__order_status='DELIVERED'
         ).values_list('product_id', flat=True).distinct()
         return Product.objects.filter(product_id__in=product_ids)
+    
 
     class Meta:
         db_table = 'Seller'
@@ -330,6 +331,109 @@ class Product(models.Model):
         # Then update discount fields if it's not a new product and we're not in a recursive update
         if not is_new and not self._skip_update and 'update_fields' not in kwargs:
             self.update_discounted_price()
+
+    def delete(self, using=None, keep_parents=False):
+        self.is_deleted = True
+        self.save()
+
+    class Meta:
+        db_table = 'Products'
+
+class ProductManager(models.Manager):
+    def get_queryset(self):
+        return super().get_queryset().filter(is_deleted=False)
+
+class Product(models.Model):
+    product_id = models.CharField(primary_key=True, max_length=36, unique=True, editable=False, default=uuid.uuid4)
+    seller_id = models.ForeignKey(Seller, on_delete=models.CASCADE, null=True)
+    product_name = models.CharField(max_length=255)
+    product_price = models.DecimalField(max_digits=10, decimal_places=2, default=0,
+                                        validators=[MinValueValidator(0.01)])
+    product_brief_description = models.CharField(max_length=255)
+    product_full_description = models.CharField(max_length=255)
+    product_discountedPrice = models.DecimalField(max_digits=10, decimal_places=2, null=True)
+    product_sku = models.CharField(max_length=50, null=True, blank=True)
+    product_status = models.CharField(
+        max_length=20,
+        choices=[
+            ('ROTTEN', 'Rotten'),
+            ('SLIGHTLY_WITHERED', 'Slightly Withered'),
+            ('FRESH', 'Fresh')
+        ],
+        default='FRESH'
+    )
+    product_location = models.CharField(max_length=255, null=True)
+    sub_category_id = models.ForeignKey(SubCategory, on_delete=models.CASCADE, null=True)
+    has_promo = models.BooleanField(default=False)
+    weight = models.DecimalField(max_digits=10, decimal_places=2, default=0,
+                                 validators=[MinValueValidator(0.01)])
+    quantity = models.IntegerField(default=1, validators=[MinValueValidator(0)])
+    post_date = models.DateTimeField(default=timezone.now)
+    harvest_date = models.DateTimeField(null=True)
+    is_active = models.BooleanField(default=True)
+    review_count = models.IntegerField(default=0)
+    top_rated = models.BooleanField(default=False)
+    is_srp = models.BooleanField(default=False)
+    is_discounted = models.BooleanField(default=False)
+    is_deleted = models.BooleanField(default=False)
+    sell_count = models.IntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    _skip_update = False  # Flag to prevent recursive updates
+
+    objects = ProductManager()  # Default manager excludes deleted
+    all_objects = models.Manager()  # Includes deleted
+
+    @property
+    def user_id(self):
+        return self.seller_id.user_id.user_id if self.seller_id and self.seller_id.user_id else None
+
+    @property
+    def category_id(self):
+        return self.sub_category_id.category_id if self.sub_category_id else None
+
+    @property
+    def discounted_amount(self):
+        if self.product_discountedPrice is not None:
+            return self.product_price - self.product_discountedPrice
+        return None
+
+    def update_discounted_price(self):
+        if not self._skip_update and self.pk:  # Only update if product exists and not in recursive update
+            from .services.product_services import update_product_discounted_price
+            self._skip_update = True  # Set flag to prevent recursion
+            try:
+                update_product_discounted_price(self)
+            finally:
+                self._skip_update = False  # Reset flag
+
+    def save(self, *args, **kwargs):
+        from .services.product_services import generate_product_sku
+        
+        is_new = not self.pk  # Check if this is a new product
+        
+        # product_id auto-set by default using UUID
+
+        if not self.product_sku:
+            # Optionally auto-generate SKU (not enforced unique globally)
+            try:
+                self.product_sku = generate_product_sku(self)
+            except Exception:
+                pass  # leave blank if generator fails
+
+        if self.product_price > 0 and (self.product_discountedPrice is None or self.product_discountedPrice <= 0):
+            self.is_srp = True
+
+        # First save the product
+        super().save(*args, **kwargs)
+        
+        # Then update discount fields if it's not a new product and we're not in a recursive update
+        if not is_new and not self._skip_update and 'update_fields' not in kwargs:
+            self.update_discounted_price()
+
+    def delete(self, using=None, keep_parents=False):
+        self.is_deleted = True
+        self.save()
 
     class Meta:
         db_table = 'Products'
@@ -516,7 +620,7 @@ class CartItem(models.Model):
 
 #ORDER
 class Order(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    order_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False, unique=True)
     order_number = models.CharField(max_length=20, unique=True, editable=False)
     user_id = models.ForeignKey(User, on_delete=models.CASCADE, null=True, db_column='user_id')
     order_date = models.DateTimeField(auto_now_add=True)
@@ -597,7 +701,7 @@ class Payment(models.Model):
         ('REFUNDED', 'Refunded'),
     ]
     payment_id = models.CharField(primary_key=True, max_length=12, unique=True, editable=False)
-    order = models.OneToOneField(Order, on_delete=models.CASCADE, related_name='payment')
+    order_id = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='payments')
     payment_method = models.CharField(max_length=20, choices=PAYMENT_METHODS)
     payment_status = models.CharField(max_length=20, choices=PAYMENT_STATUS, default='PENDING')
     amount = models.DecimalField(max_digits=10, decimal_places=2)
@@ -607,4 +711,4 @@ class Payment(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f"{self.payment_id} - {self.order.order_number} - {self.payment_status}"
+        return f"{self.payment_id} - {self.order_id.order_number} - {self.payment_status}"
