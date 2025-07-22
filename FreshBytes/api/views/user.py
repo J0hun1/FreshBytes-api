@@ -8,10 +8,24 @@ from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from ..models import User
 from ..serializers import UserSerializer, CustomTokenObtainPairSerializer
+from ..permissions import IsAdmin, IsSeller, IsCustomer
 
 class CustomTokenObtainPairView(TokenObtainPairView):
     permission_classes = [AllowAny]
     serializer_class = CustomTokenObtainPairSerializer
+
+class AdminDashboardView(APIView):
+    permission_classes = [IsAuthenticated, IsAdmin]
+
+    def get(self, request):
+        # Example admin data
+        data = {
+            "message": "Welcome, admin!",
+            "stats": {
+                # ... your admin dashboard data here ...
+            }
+        }
+        return Response(data)
 
 class RegisterView(generics.CreateAPIView):
     permission_classes = [AllowAny]
@@ -108,7 +122,7 @@ class DeletedUserRetrieveDestroy(generics.RetrieveDestroyAPIView):
         return User.objects.filter(is_deleted=True)
 
 class UserPermissionsView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsAdmin]
     def get(self, request):
         user = request.user
         user_permissions = list(user.get_all_permissions())

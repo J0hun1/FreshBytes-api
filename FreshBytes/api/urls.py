@@ -110,4 +110,9 @@ urlpatterns = [
     path('sellers/<uuid:seller_id>/customers/', views.SellerCustomersView.as_view(), name='seller-customers'),  # Get list of customers who bought from specific seller
     path('sellers/<uuid:seller_id>/transactions/', views.SellerTransactionsView.as_view(), name='seller-transactions'),  # Get all transactions/orders for specific seller
     path('sellers/<uuid:seller_id>/customers/<uuid:customer_id>/products/', views.SellerProductsBoughtByCustomerView.as_view(), name='seller-products-by-customer'),  # Get products bought by specific customer from specific seller
+
+    # ========================================
+    # ADMIN DASHBOARD ENDPOINT
+    # ========================================
+    path("admin/dashboard/", views.AdminDashboardView.as_view(), name="admin-dashboard"),
 ]
