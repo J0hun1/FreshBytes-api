@@ -111,8 +111,7 @@ class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ['user_id', 'user_name', 'first_name', 'last_name', 'user_email', 
-                 'password', 'user_phone', 'user_address', 'role', 'created_at', 
-                 'updated_at', 'is_active', 'is_deleted', 'is_superuser', 'street', 'barangay', 'city', 'province', 'zip_code']
+                 'password', 'user_phone', 'street', 'barangay', 'city', 'province', 'zip_code','role', 'created_at', 'updated_at', 'is_active', 'is_deleted', 'is_superuser', ]
         read_only_fields = ['user_id', 'created_at', 'updated_at']
         extra_kwargs = {
             'password': {'write_only': True}
@@ -140,7 +139,7 @@ class UserSerializer(serializers.ModelSerializer):
 class SellerSerializer(serializers.ModelSerializer):
     class Meta:
         model = Seller
-        fields = ["seller_id", "user_id", "business_name", "business_email", "business_phone", "business_address", "total_earnings", "total_products", "total_orders", "total_reviews", "average_rating", "total_followers", "total_likes", "total_products_sold", "created_at", "updated_at", "is_active", "is_deleted"]
+        fields = ["seller_id", "user_id", "business_name", 'street', 'barangay', 'city', 'province', 'zip_code', "business_phone", "total_earnings", "total_products", "total_orders", "total_reviews", "average_rating", "total_followers", "total_likes", "total_products_sold", "created_at", "updated_at", "is_active", "is_deleted"]
 
 class ReviewsSerializer(serializers.ModelSerializer):
     class Meta:
