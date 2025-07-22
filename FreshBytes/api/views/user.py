@@ -1,0 +1,179 @@
+from rest_framework import generics, status
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated, AllowAny, BasePermission
+from rest_framework_simplejwt.views import TokenObtainPairView
+from rest_framework_simplejwt.tokens import RefreshToken
+from django.shortcuts import get_object_or_404
+from django.utils import timezone
+from ..models import User
+from ..serializers import UserSerializer, CustomTokenObtainPairSerializer
+
+class CustomTokenObtainPairView(TokenObtainPairView):
+    permission_classes = [AllowAny]
+    serializer_class = CustomTokenObtainPairSerializer
+
+class RegisterView(generics.CreateAPIView):
+    permission_classes = [AllowAny]
+    queryset = User.objects.all()
+    serializer_class = UserSerializer
+
+class LogoutView(APIView):
+    permission_classes = [IsAuthenticated]
+    def post(self, request):
+        try:
+            refresh_token = request.data["refresh_token"]
+            token = RefreshToken(refresh_token)
+            token.blacklist()
+            return Response({"message": "Successfully logged out."}, status=status.HTTP_200_OK)
+        except Exception:
+            return Response({"error": "Invalid token."}, status=status.HTTP_400_BAD_REQUEST)
+
+class UserPostListCreate(generics.ListCreateAPIView):
+    queryset = User.objects.all()
+    serializer_class = UserSerializer
+    permission_classes = [IsAuthenticated, BasePermission]
+    def delete(self, request, *args, **kwargs):
+        if not (request.user.role == 'admin'):
+            return Response({"error": "Only admins can perform this action."}, status=status.HTTP_403_FORBIDDEN)
+        User.objects.all().delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+class UserPostRetrieveUpdateDestroy(generics.RetrieveUpdateDestroyAPIView):
+    queryset = User.objects.all()
+    serializer_class = UserSerializer
+    permission_classes = [IsAuthenticated]
+    lookup_field = "pk"
+    def get_permissions(self):
+        if self.request.method in ['DELETE']:
+            return [IsAuthenticated(), BasePermission()]
+        return [IsAuthenticated()]
+    def get_queryset(self):
+        user = self.request.user
+        if user.role == 'admin':
+            return User.objects.all()
+        return User.objects.filter(user_id=user.user_id)
+    def perform_destroy(self, instance):
+        instance.is_deleted = True
+        instance.is_active = False
+        instance.save()
+
+class RestoreUser(APIView):
+    permission_classes = [IsAuthenticated, BasePermission]
+    def post(self, request, pk):
+        try:
+            user = User.objects.get(pk=pk, is_deleted=True)
+        except User.DoesNotExist:
+            return Response({"error": "User not found or not deleted."}, status=status.HTTP_404_NOT_FOUND)
+        user.is_deleted = False
+        user.is_active = True
+        user.save(update_fields=["is_deleted", "is_active"])
+        return Response(UserSerializer(user).data, status=status.HTTP_200_OK)
+
+class DisableUser(APIView):
+    permission_classes = [IsAuthenticated, BasePermission]
+    def post(self, request, pk):
+        user = get_object_or_404(User, pk=pk, is_deleted=False)
+        if not user.is_active:
+            return Response({"detail": "User already inactive."}, status=400)
+        user.is_active = False
+        user.save(update_fields=["is_active"])
+        return Response({"detail": "User disabled."}, status=200)
+
+class EnableUser(APIView):
+    permission_classes = [IsAuthenticated, BasePermission]
+    def post(self, request, pk):
+        user = get_object_or_404(User, pk=pk, is_deleted=False)
+        if user.is_active:
+            return Response({"detail": "User already active."}, status=400)
+        user.is_active = True
+        user.save(update_fields=["is_active"])
+        return Response(UserSerializer(user).data, status=200)
+
+class DeletedUsersListDelete(generics.ListAPIView):
+    serializer_class = UserSerializer
+    permission_classes = [IsAuthenticated, BasePermission]
+    def get_queryset(self):
+        return User.objects.filter(is_deleted=True)
+    def delete(self, request, *args, **kwargs):
+        count = User.objects.filter(is_deleted=True).count()
+        User.objects.filter(is_deleted=True).delete()
+        return Response({"deleted": count}, status=status.HTTP_204_NO_CONTENT)
+
+class DeletedUserRetrieveDestroy(generics.RetrieveDestroyAPIView):
+    serializer_class = UserSerializer
+    permission_classes = [IsAuthenticated, BasePermission]
+    lookup_field = "pk"
+    def get_queryset(self):
+        return User.objects.filter(is_deleted=True)
+
+class UserPermissionsView(APIView):
+    permission_classes = [IsAuthenticated]
+    def get(self, request):
+        user = request.user
+        user_permissions = list(user.get_all_permissions())
+        group_permissions = []
+        for group in user.groups.all():
+            group_permissions.extend([
+                f"{perm.content_type.app_label}.{perm.codename}" 
+                for perm in group.permissions.all()
+            ])
+        return Response({
+            'user_id': str(user.user_id),
+            'email': user.user_email,
+            'role': user.role,
+            'primary_role': user.get_primary_role(),
+            'groups': [group.name for group in user.groups.all()],
+            'permissions': {
+                'all_permissions': user_permissions,
+                'group_permissions': list(set(group_permissions)),
+                'role_checks': {
+                    'is_admin': user.is_admin(),
+                    'is_seller': user.is_seller(),
+                    'is_customer': user.is_customer(),
+                },
+                'specific_permissions': {
+                    'can_add_product': user.has_perm('api.add_product'),
+                    'can_change_product': user.has_perm('api.change_product'),
+                    'can_delete_product': user.has_perm('api.delete_product'),
+                    'can_approve_products': user.has_perm('api.can_approve_products'),
+                    'can_feature_products': user.has_perm('api.can_feature_products'),
+                    'can_view_seller_stats': user.has_perm('api.can_view_seller_stats'),
+                    'can_manage_sellers': user.has_perm('api.can_manage_sellers'),
+                    'can_moderate_reviews': user.has_perm('api.can_moderate_reviews'),
+                    'can_view_all_orders': user.has_perm('api.can_view_all_orders'),
+                }
+            }
+        })
+    def post(self, request):
+        permission = request.data.get('permission')
+        if not permission:
+            return Response({'error': 'Permission parameter is required'}, status=status.HTTP_400_BAD_REQUEST)
+        if '.' not in permission:
+            permission = f'api.{permission}'
+        has_permission = request.user.has_perm(permission)
+        return Response({
+            'permission': permission,
+            'has_permission': has_permission,
+            'user_id': str(request.user.user_id),
+            'checked_at': timezone.now().isoformat()
+        })
+
+class UserRoleCheckView(APIView):
+    permission_classes = [IsAuthenticated]
+    def post(self, request):
+        roles = request.data.get('roles', [])
+        if not isinstance(roles, list):
+            roles = [roles]
+        user = request.user
+        role_results = {}
+        for role in roles:
+            role_results[role] = user.has_role(role)
+        return Response({
+            'user_id': str(user.user_id),
+            'current_role': user.role,
+            'primary_role': user.get_primary_role(),
+            'groups': [group.name for group in user.groups.all()],
+            'role_checks': role_results,
+            'has_any_role': any(role_results.values())
+        })

@@ -1,7 +1,6 @@
 from django.urls import path
 from . import views
 from rest_framework_simplejwt.views import TokenRefreshView
-from .views import ProductSoftDeleteView, ProductRestoreView, DeletedProductListView
 
 urlpatterns = [
     # ========================================
@@ -12,7 +11,6 @@ urlpatterns = [
     path("auth/login/refresh/", TokenRefreshView.as_view(), name="token_refresh"),  # Refresh expired JWT token
     path("auth/register/", views.RegisterView.as_view(), name="auth_register"),  # Register new user account
     path("auth/logout/", views.LogoutView.as_view(), name="auth_logout"),  # Logout and blacklist token
-    path("auth/test/", views.TestAuthView.as_view(), name="test_auth"),  # Test if authentication is working
     
     # Permission and role checking endpoints
     path("auth/permissions/", views.UserPermissionsView.as_view(), name="user_permissions"),  # Get user's permissions and roles
@@ -23,9 +21,9 @@ urlpatterns = [
     # ========================================
     path("products/", views.ProductPostListCreate.as_view(), name="products"),  # List all products or create new product
     path("products/<str:pk>/", views.ProductPostRetrieveUpdateDestroy.as_view(), name="product-detail"),  # Get, update, or delete specific product
-    path("products/<uuid:product_id>/soft-delete/", ProductSoftDeleteView.as_view(), name="product-soft-delete"),  # Soft-delete a product (set is_deleted=True)
-    path("products/<uuid:product_id>/restore/", ProductRestoreView.as_view(), name="product-restore"),  # Restore a soft-deleted product (set is_deleted=False)
-    path("products/deleted/", DeletedProductListView.as_view(), name="deleted-product-list"),  # List all soft-deleted products
+    path("products/<uuid:product_id>/soft-delete/", views.ProductSoftDeleteView.as_view(), name="product-soft-delete"),  # Soft-delete a product (set is_deleted=True)
+    path("products/<uuid:product_id>/restore/", views.ProductRestoreView.as_view(), name="product-restore"),  # Restore a soft-deleted product (set is_deleted=False)
+    path("products/deleted/", views.DeletedProductListView.as_view(), name="deleted-product-list"),  # List all soft-deleted products
 
     # ========================================
     # CATEGORY MANAGEMENT ENDPOINTS
@@ -59,7 +57,6 @@ urlpatterns = [
     path("sellers/<uuid:pk>/", views.AllSellersPostRetrieveUpdateDestroy.as_view(), name="seller-detail"),  # Get, update, or delete specific seller profile
     path("sellers/<uuid:seller_id>/products/", views.SellerProductsPostListCreate.as_view(), name="seller-products"),  # List products by specific seller or add product to seller
     path("sellers/<uuid:seller_id>/products/<uuid:product_id>/", views.SellerProductPostRetrieveUpdateDestroy.as_view(), name="seller-product-detail"),  # Get, update, or delete specific product for seller
-
     path("sellers/<uuid:seller_id>/<uuid:product_id>/", views.SellerProductPostRetrieveUpdateDestroy.as_view(), name="seller-product-delete"),  # Alternative route for seller product operations
 
     # ========================================
@@ -77,7 +74,6 @@ urlpatterns = [
     # ========================================
     # SHOPPING CART ENDPOINTS
     # ========================================
-    # path("carts/", views.CartPostListCreate.as_view(), name="carts"),  # Commented out - using ViewSet instead
     path('cart/', views.CartViewSet.as_view({
         'get': 'list',
         'post': 'create'
@@ -91,14 +87,10 @@ urlpatterns = [
     # ========================================
     path("orders/", views.OrderPostListCreate.as_view(), name="orders"),  # List all orders or create new order
     path("orders/checkout/", views.OrderCheckoutView.as_view(), name="order-checkout"),  # Create order from cart items
-
     path("orders/<uuid:id>/", views.OrderDetailView.as_view(), name="order-detail"),
-
     path("orders/<str:order_id>/status/", views.OrderStatusUpdateView.as_view(), name="order-status-update"),  # Update order status (seller/admin only, customer can cancel pending orders)
     path("orders/<uuid:order_id>/archive/", views.OrderArchiveView.as_view(), name="order-archive"),  # Archive or unarchive an order (admin or order owner)
     path("orders/<str:order_number>/", views.OrderDetailView.as_view(), name="order-detail"),  # Get, update, or delete specific order
-
-    # lookup by order number
     path("orders/number/<str:order_number>/", views.OrderDetailView.as_view(), name="order-detail-by-number"),
 
     # ========================================
