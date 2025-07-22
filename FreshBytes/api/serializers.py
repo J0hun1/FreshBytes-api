@@ -1,16 +1,5 @@
 from rest_framework import serializers
-from .models import Product
-from .models import Category
-from .models import User
-from .models import Seller
-from .models import SubCategory
-from .models import Reviews
-from .models import Promo
-from .models import Cart
-from .models import CartItem
-from .models import Order
-from .models import OrderItem
-from .models import Payment
+from .models import Product, Category, User, Seller, SubCategory, Reviews, Promo, Cart, CartItem, Order, OrderItem, Payment
 from django.contrib.auth import get_user_model
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from django.contrib.auth.hashers import make_password
