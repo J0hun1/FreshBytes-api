@@ -1,9 +1,10 @@
 django
 djangorestframework
-environs
+djangorestframework-simplejwt
 django-cors-headers
 django-filter
 psycopg
 psycopg2-binary
 Pillow
 django-redis
+environs

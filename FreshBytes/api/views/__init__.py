@@ -1,4 +1,5 @@
-from .product import ProductPostListCreate, ProductPostRetrieveUpdateDestroy, ProductSoftDeleteView, ProductRestoreView, DeletedProductListView
+from .product import ProductViewSet
+
 from .user import (
     CustomTokenObtainPairView, RegisterView, LogoutView, UserPostListCreate, UserPostRetrieveUpdateDestroy,
     RestoreUser, DisableUser, EnableUser, DeletedUsersListDelete, DeletedUserRetrieveDestroy,

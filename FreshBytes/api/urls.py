@@ -1,6 +1,10 @@
 from django.urls import path
 from . import views
 from rest_framework_simplejwt.views import TokenRefreshView
+from rest_framework.routers import DefaultRouter
+
+router = DefaultRouter()
+router.register(r'products', views.ProductViewSet, basename='product')
 
 urlpatterns = [
     # ========================================
@@ -19,11 +23,7 @@ urlpatterns = [
     # ========================================
     # PRODUCT MANAGEMENT ENDPOINTS
     # ========================================
-    path("products/", views.ProductPostListCreate.as_view(), name="products"),  # List all products or create new product
-    path("products/<str:pk>/", views.ProductPostRetrieveUpdateDestroy.as_view(), name="product-detail"),  # Get, update, or delete specific product
-    path("products/<uuid:product_id>/soft-delete/", views.ProductSoftDeleteView.as_view(), name="product-soft-delete"),  # Soft-delete a product (set is_deleted=True)
-    path("products/<uuid:product_id>/restore/", views.ProductRestoreView.as_view(), name="product-restore"),  # Restore a soft-deleted product (set is_deleted=False)
-    path("products/deleted/", views.DeletedProductListView.as_view(), name="deleted-product-list"),  # List all soft-deleted products
+    # Product endpoints are now handled by the router
 
     # ========================================
     # CATEGORY MANAGEMENT ENDPOINTS
@@ -115,4 +115,5 @@ urlpatterns = [
     # ADMIN DASHBOARD ENDPOINT
     # ========================================
     path("admin/dashboard/", views.AdminDashboardView.as_view(), name="admin-dashboard"),
+    *router.urls,
 ]

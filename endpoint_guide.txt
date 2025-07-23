@@ -1,0 +1,479 @@
+# FreshBytes API Endpoint Guide
+# Frontend Developer Reference
+
+## Base URL
+    All endpoints are prefixed with: `http://127.0.0.1:8000/api/`
+
+## Authentication
+    Most endpoints require authentication. Include this header:
+    ```
+    Authorization: Bearer <your_jwt_token>
+    ```
+---
+
+## 📝 NOTES
+
+1. **Authentication:** Most endpoints require a valid JWT token in the Authorization header
+2. **Permissions:** Different endpoints have different permission requirements (admin, seller, customer)
+3. **Status Codes:** Always check HTTP status codes along with response data
+4. **Pagination:** List endpoints may support pagination (check response headers)
+5. **File Uploads:** For image uploads, use `multipart/form-data` instead of `application/json`
+
+---
+
+## 🚀 QUICK START
+
+1. **Register/Login** to get JWT token
+2. **Browse products** to see available items
+3. **Add items to cart** using cart endpoints
+4. **Checkout** to create an order
+5. **Make payment** to complete the purchase
+6. **Track order status** using order endpoints
+
+
+## 🔐 AUTHENTICATION & AUTHORIZATION
+
+### Login
+    - **URL:** `POST /auth/login/`
+    - **Purpose:** Authenticate user and get JWT tokens
+    - **Headers:** `Content-Type: application/json`
+    - **Body:**
+    ```json
+    {
+      "user_email": "user@example.com",
+      "password": "your_password"
+    }
+    ```
+    - **Response:**
+    ```json
+    {
+      "access": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...",
+      "refresh": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...",
+      "user_email": "user@example.com",
+      "role": "customer",
+      "user_name": "John Doe"
+    }
+    ```
+
+### Refresh Token
+    - **URL:** `POST /auth/login/refresh/`
+    - **Purpose:** Get new access token using refresh token
+    - **Headers:** `Content-Type: application/json`
+    - **Body:**
+    ```json
+    {
+      "refresh": "your_refresh_token"
+    }
+    ```
+
+### Register
+    - **URL:** `POST /auth/register/`
+    - **Purpose:** Create new user account
+    - **Headers:** `Content-Type: application/json`
+    - **Body:**
+    ```json
+    {
+      "user_name": "John Doe",
+      "first_name": "John",
+      "last_name": "Doe",
+      "user_email": "john@example.com",
+      "password": "secure_password",
+      "user_phone": "1234567890",
+      "user_address": "123 Main St"
+    }
+    ```
+
+### Logout
+    - **URL:** `POST /auth/logout/`
+    - **Purpose:** Logout and blacklist token
+    - **Headers:** `Authorization: Bearer <token>`, `Content-Type: application/json`
+    - **Body:**
+    ```json
+    {
+      "refresh_token": "your_refresh_token"
+    }
+    ```
+
+### Test Authentication
+    - **URL:** `GET /auth/test/`
+    - **Purpose:** Test if authentication is working
+    - **Headers:** `Authorization: Bearer <token>`
+
+### Get User Permissions
+    - **URL:** `GET /auth/permissions/`
+    - **Purpose:** Get user's permissions and roles
+    - **Headers:** `Authorization: Bearer <token>`
+
+### Check User Roles
+    - **URL:** `POST /auth/check-roles/`
+    - **Purpose:** Check if user has specific roles
+    - **Headers:** `Authorization: Bearer <token>`, `Content-Type: application/json`
+    - **Body:**
+    ```json
+    {
+      "roles": ["admin", "seller"]
+    }
+    ```
+
+---
+
+## 🛍️ PRODUCTS
+
+### List All Products
+    - **URL:** `GET /products/`
+    - **Purpose:** Get all available products
+    - **Headers:** None required
+
+### Get Single Product
+    - **URL:** `GET /products/<product_id>/`
+    - **Purpose:** Get details of specific product
+    - **Headers:** None required
+
+### Create Product (Admin/Seller)
+    - **URL:** `POST /products/`
+    - **Purpose:** Create new product
+    - **Headers:** `Authorization: Bearer <token>`, `Content-Type: application/json`
+    - **Body:**
+    ```json
+    {
+      "product_name": "Fresh Bananas",
+      "product_price": "2.99",
+      "product_brief_description": "Sweet yellow bananas",
+      "product_full_description": "Fresh organic bananas from local farms",
+      "sub_category_id": "subcategory_id",
+      "quantity": 100,
+      "weight": "0.5"
+    }
+    ```
+
+### Update Product
+    - **URL:** `PUT /products/<product_id>/`
+    - **Purpose:** Update product details
+    - **Headers:** `Authorization: Bearer <token>`, `Content-Type: application/json`
+
+### Delete Product
+    - **URL:** `DELETE /products/<product_id>/`
+    - **Purpose:** Delete product
+    - **Headers:** `Authorization: Bearer <token>`
+
+---
+
+## 🛒 SHOPPING CART
+
+### Get Cart
+    - **URL:** `GET /cart/`
+    - **Purpose:** Get current user's cart
+    - **Headers:** `Authorization: Bearer <token>`
+
+### Add Item to Cart
+    - **URL:** `POST /cart/`
+    - **Purpose:** Add product to cart
+    - **Headers:** `Authorization: Bearer <token>`, `Content-Type: application/json`
+    - **Body:**
+    ```json
+    {
+      "product_id": "product_uuid",
+      "quantity": 2
+    }
+    ```
+
+### Update Cart Item
+    - **URL:** `POST /cart/update-item/`
+    - **Purpose:** Update quantity of item in cart
+    - **Headers:** `Authorization: Bearer <token>`, `Content-Type: application/json`
+    - **Body:**
+    ```json
+    {
+      "product_id": "product_uuid",
+      "quantity": 5
+    }
+    ```
+
+### Remove Item from Cart
+    - **URL:** `POST /cart/remove-item/`
+    - **Purpose:** Remove specific item from cart
+    - **Headers:** `Authorization: Bearer <token>`, `Content-Type: application/json`
+    - **Body:**
+    ```json
+    {
+      "product_id": "product_uuid"
+    }
+    ```
+
+### Clear Cart
+    - **URL:** `POST /cart/clear/`
+    - **Purpose:** Remove all items from cart
+    - **Headers:** `Authorization: Bearer <token>`
+
+---
+
+## 📦 ORDERS
+
+### List Orders
+    - **URL:** `GET /orders/`
+    - **Purpose:** Get all orders for current user
+    - **Headers:** `Authorization: Bearer <token>`
+
+### Get Single Order
+    - **URL:** `GET /orders/<order_id>/`
+    - **Purpose:** Get details of specific order
+    - **Headers:** `Authorization: Bearer <token>`
+
+### Checkout (Create Order from Cart)
+    - **URL:** `POST /orders/checkout/`
+    - **Purpose:** Create order from cart items
+    - **Headers:** `Authorization: Bearer <token>`, `Content-Type: application/json`
+    - **Body (optional):**
+    ```json
+    {
+      "cart_item_ids": ["cart_item_uuid1", "cart_item_uuid2"]
+    }
+    ```
+    - **Note:** If no cart_item_ids provided, all cart items will be ordered
+
+### Update Order Status
+    - **URL:** `PATCH /orders/<order_id>/status/`
+    - **Purpose:** Update order status
+    - **Headers:** `Authorization: Bearer <token>`, `Content-Type: application/json`
+    - **Body:**
+    ```json
+    {
+      "order_status": "DELIVERED"
+    }
+    ```
+    - **Allowed Statuses:** PENDING, CONFIRMED, SHIPPED, DELIVERED, CANCELLED, REFUNDED
+    - **Permissions:** 
+      - Sellers/Admins: Can set any status
+      - Customers: Can only cancel PENDING orders
+
+---
+
+## 💳 PAYMENTS
+
+### Create Payment
+    - **URL:** `POST /payments/`
+    - **Purpose:** Create payment for order
+    - **Headers:** `Authorization: Bearer <token>`, `Content-Type: application/json`
+    - **Body:**
+    ```json
+    {
+      "order": "order_id",
+      "payment_method": "GCASH",
+      "amount": "123.45"
+    }
+    ```
+    - **Payment Methods:** GCASH, PAYMAYA, COD
+
+### Get Payment Details
+    - **URL:** `GET /payments/<payment_id>/`
+    - **Purpose:** Get payment information
+    - **Headers:** `Authorization: Bearer <token>`
+
+---
+
+## 👥 USERS
+
+### List Users (Admin Only)
+    - **URL:** `GET /users/`
+    - **Purpose:** Get all users
+    - **Headers:** `Authorization: Bearer <token>`
+
+### Get User Profile
+    - **URL:** `GET /users/<user_id>/`
+    - **Purpose:** Get user details
+    - **Headers:** `Authorization: Bearer <token>`
+
+### Update User Profile
+    - **URL:** `PUT /users/<user_id>/`
+    - **Purpose:** Update user information
+    - **Headers:** `Authorization: Bearer <token>`, `Content-Type: application/json`
+
+---
+
+## 🏪 SELLERS
+
+### List Sellers
+    - **URL:** `GET /sellers/`
+    - **Purpose:** Get all sellers
+    - **Headers:** `Authorization: Bearer <token>`
+
+### Get Seller Profile
+    - **URL:** `GET /sellers/<seller_id>/`
+    - **Purpose:** Get seller details
+    - **Headers:** `Authorization: Bearer <token>`
+
+### Create Seller Profile
+    - **URL:** `POST /sellers/`
+    - **Purpose:** Register as seller
+    - **Headers:** `Authorization: Bearer <token>`, `Content-Type: application/json`
+    - **Body:**
+    ```json
+    {
+      "business_name": "Fresh Farm",
+      "business_email": "farm@example.com",
+      "business_phone": "1234567890",
+      "business_address": "456 Farm Road"
+    }
+    ```
+
+### Get Seller's Products
+    - **URL:** `GET /sellers/<seller_id>/products/`
+    - **Purpose:** Get all products by specific seller
+    - **Headers:** `Authorization: Bearer <token>`
+
+### Add Product to Seller
+    - **URL:** `POST /sellers/<seller_id>/products/`
+    - **Purpose:** Add product to seller's inventory
+    - **Headers:** `Authorization: Bearer <token>`, `Content-Type: application/json`
+
+---
+
+## 📊 SELLER ANALYTICS
+
+### Get Seller's Customers
+    - **URL:** `GET /sellers/<seller_id>/customers/`
+    - **Purpose:** Get list of customers who bought from seller
+    - **Headers:** `Authorization: Bearer <token>`
+
+### Get Seller's Transactions
+    - **URL:** `GET /sellers/<seller_id>/transactions/`
+    - **Purpose:** Get all orders/transactions for seller
+    - **Headers:** `Authorization: Bearer <token>`
+
+### Get Products Bought by Customer
+    - **URL:** `GET /sellers/<seller_id>/customers/<customer_id>/products/`
+    - **Purpose:** Get products bought by specific customer from seller
+    - **Headers:** `Authorization: Bearer <token>`
+
+---
+
+## 🏷️ CATEGORIES & SUBCATEGORIES
+
+### List Categories
+    - **URL:** `GET /categories/`
+    - **Purpose:** Get all product categories
+    - **Headers:** None required
+
+### Get Category
+    - **URL:** `GET /categories/<category_id>/`
+    - **Purpose:** Get specific category
+    - **Headers:** None required
+
+### List Subcategories
+    - **URL:** `GET /subcategories/`
+    - **Purpose:** Get all subcategories
+    - **Headers:** None required
+
+### Get Subcategory
+    - **URL:** `GET /subcategories/<subcategory_id>/`
+    - **Purpose:** Get specific subcategory
+    - **Headers:** None required
+
+---
+
+## ⭐ REVIEWS
+
+### List Reviews
+    - **URL:** `GET /reviews/`
+    - **Purpose:** Get all reviews
+    - **Headers:** None required
+
+### Get Review
+    - **URL:** `GET /reviews/<review_id>/`
+    - **Purpose:** Get specific review
+    - **Headers:** None required
+
+### Create Review
+    - **URL:** `POST /reviews/`
+    - **Purpose:** Create new review
+    - **Headers:** `Authorization: Bearer <token>`, `Content-Type: application/json`
+    - **Body:**
+    ```json
+    {
+      "product_id": "product_uuid",
+      "review_rating": 5,
+      "review_comment": "Great product!"
+    }
+    ```
+
+---
+
+## 🎉 PROMOS/DISCOUNTS
+
+### List Promos
+    - **URL:** `GET /promos/`
+    - **Purpose:** Get all active promos
+    - **Headers:** None required
+
+### Get Promo
+    - **URL:** `GET /promos/<promo_id>/`
+    - **Purpose:** Get specific promo details
+    - **Headers:** None required
+
+### Create Promo (Seller/Admin)
+    - **URL:** `POST /promos/`
+    - **Purpose:** Create new promo
+    - **Headers:** `Authorization: Bearer <token>`, `Content-Type: application/json`
+    - **Body:**
+    ```json
+    {
+      "promo_name": "Summer Sale",
+      "promo_description": "20% off all fruits",
+      "discount_type": "PERCENTAGE",
+      "discount_percentage": 20,
+      "promo_start_date": "2024-07-01T00:00:00Z",
+      "promo_end_date": "2024-07-31T23:59:59Z",
+      "product_id": ["product_uuid1", "product_uuid2"]
+    }
+    ```
+
+---
+
+## 📋 ORDER ITEMS
+
+### List Order Items
+    - **URL:** `GET /order-items/`
+    - **Purpose:** Get all order items
+    - **Headers:** `Authorization: Bearer <token>`
+
+---
+
+## 🔧 ERROR RESPONSES
+
+All endpoints may return these error responses:
+
+### 400 Bad Request
+    ```json
+    {
+      "error": "Invalid data provided"
+    }
+    ```
+
+### 401 Unauthorized
+    ```json
+    {
+      "detail": "Authentication credentials were not provided."
+    }
+    ```
+
+### 403 Forbidden
+    ```json
+    {
+      "error": "Permission denied."
+    }
+    ```
+
+### 404 Not Found
+    ```json
+    {
+      "error": "Resource not found."
+    }
+    ```
+
+### 500 Internal Server Error
+    ```json
+    {
+      "error": "Something went wrong."
+    }
+    ```
+
