@@ -47,11 +47,7 @@ urlpatterns = [
     # ========================================
     # SELLER MANAGEMENT ENDPOINTS
     # ========================================
-    path("sellers/", views.AllSellersPostListCreate.as_view(), name="seller-list-create"),  # List all sellers or create seller profile
-    path("sellers/<uuid:pk>/", views.AllSellersPostRetrieveUpdateDestroy.as_view(), name="seller-detail"),  # Get, update, or delete specific seller profile
-    path("sellers/<uuid:seller_id>/products/", views.SellerProductsPostListCreate.as_view(), name="seller-products"),  # List products by specific seller or add product to seller
-    path("sellers/<uuid:seller_id>/products/<uuid:product_id>/", views.SellerProductPostRetrieveUpdateDestroy.as_view(), name="seller-product-detail"),  # Get, update, or delete specific product for seller
-    path("sellers/<uuid:seller_id>/<uuid:product_id>/", views.SellerProductPostRetrieveUpdateDestroy.as_view(), name="seller-product-delete"),  # Alternative route for seller product operations
+    # Seller endpoints are now handled by the router
 
     # ========================================
     # REVIEW MANAGEMENT ENDPOINTS
@@ -101,9 +97,7 @@ urlpatterns = [
     # ========================================
     # SELLER ANALYTICS & CUSTOMER TRACKING ENDPOINTS
     # ========================================
-    path('sellers/<uuid:seller_id>/customers/', views.SellerCustomersView.as_view(), name='seller-customers'),  # Get list of customers who bought from specific seller
-    path('sellers/<uuid:seller_id>/transactions/', views.SellerTransactionsView.as_view(), name='seller-transactions'),  # Get all transactions/orders for specific seller
-    path('sellers/<uuid:seller_id>/customers/<uuid:customer_id>/products/', views.SellerProductsBoughtByCustomerView.as_view(), name='seller-products-by-customer'),  # Get products bought by specific customer from specific seller
+    # These endpoints are now handled by the SellerViewSet router registration
 
     # ========================================
     # ADMIN DASHBOARD ENDPOINT
