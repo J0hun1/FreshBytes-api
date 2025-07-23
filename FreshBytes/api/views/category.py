@@ -1,16 +1,14 @@
-from rest_framework import generics, status
+from rest_framework import viewsets, status
+from rest_framework.decorators import action
 from rest_framework.response import Response
 from ..models import Category
 from ..serializers import CategorySerializer
 
-class CategoryPostListCreate(generics.ListCreateAPIView):
+class CategoryViewSet(viewsets.ModelViewSet):
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
-    def delete(self, request, *args, **kwargs):
-        Category.objects.all().delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
 
-class CategoryPostRetrieveUpdateDestroy(generics.RetrieveUpdateDestroyAPIView):
-    queryset = Category.objects.all()
-    serializer_class = CategorySerializer
-    lookup_field = "pk" 
+    @action(detail=False, methods=['delete'])
+    def delete_all(self, request):
+        Category.objects.all().delete()
+        return Response(status=status.HTTP_204_NO_CONTENT) 

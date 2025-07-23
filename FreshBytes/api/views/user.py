@@ -17,6 +17,7 @@ class CustomTokenObtainPairView(TokenObtainPairView):
 
 class AdminDashboardView(APIView):
     permission_classes = [IsAuthenticated, IsAdmin]
+    
 
     def get(self, request):
         # Example admin data

@@ -7,6 +7,14 @@ from ..serializers import ProductSerializer
 class ProductViewSet(viewsets.ModelViewSet):
     queryset = Product.objects.all()
     serializer_class = ProductSerializer
+    # Industry-standard query parameter support:
+    # Filtering: product_price, seller_id, is_deleted, is_active, product_name
+    # Searching: product_name
+    # Ordering: product_price, created_at
+    filterset_fields = ['product_price', 'seller_id', 'is_deleted', 'is_active', 'product_name']
+    search_fields = ['product_name']
+    ordering_fields = ['product_price', 'created_at']
+    ordering = ['-created_at']  # Default ordering: newest first
 
     @action(detail=True, methods=['patch'])
     def soft_delete(self, request, pk=None):

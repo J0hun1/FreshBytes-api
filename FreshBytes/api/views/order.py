@@ -1,27 +1,27 @@
-from rest_framework import generics, status
-from rest_framework.views import APIView
+from rest_framework import viewsets, status
+from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from django.shortcuts import get_object_or_404
 from ..models import Order, OrderItem
 from ..serializers import OrderSerializer, OrderItemSerializer
 from ..services.order_services import create_order_from_cart
 from ..services.seller_services import update_seller_stats_on_order_delivered
 
-class OrderPostListCreate(generics.ListCreateAPIView):
+class OrderViewSet(viewsets.ModelViewSet):
     queryset = Order.objects.all()
     serializer_class = OrderSerializer
-    def delete(self, request, *args, **kwargs):
-        Order.objects.all().delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
-
-class OrderPostRetrieveUpdateDestroy(generics.RetrieveUpdateDestroyAPIView):
-    queryset = Order.objects.all()
-    serializer_class = OrderSerializer
-    lookup_field = "pk"
-
-class OrderCheckoutView(APIView):
     permission_classes = [IsAuthenticated]
-    def post(self, request):
+    lookup_field = 'order_id'
+
+    def get_object(self):
+        order_number = self.kwargs.get('order_number')
+        if order_number:
+            return get_object_or_404(Order, order_number=order_number)
+        return super().get_object()
+
+    @action(detail=False, methods=['post'])
+    def checkout(self, request):
         cart_item_ids = request.data.get('cart_item_ids', None)
         try:
             order = create_order_from_cart(request.user, cart_item_ids)
@@ -29,13 +29,9 @@ class OrderCheckoutView(APIView):
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-class OrderStatusUpdateView(APIView):
-    permission_classes = [IsAuthenticated]
-    def patch(self, request, order_id):
-        try:
-            order = Order.objects.get(order_id=order_id)
-        except Order.DoesNotExist:
-            return Response({'error': 'Order not found.'}, status=status.HTTP_404_NOT_FOUND)
+    @action(detail=True, methods=['patch'])
+    def update_status(self, request, order_id=None):
+        order = self.get_object()
         user = request.user
         is_admin = user.is_admin() if hasattr(user, 'is_admin') else (user.role == 'admin')
         is_order_owner = (order.user_id == user)
@@ -63,13 +59,9 @@ class OrderStatusUpdateView(APIView):
             update_seller_stats_on_order_delivered(order)
         return Response(OrderSerializer(order).data, status=status.HTTP_200_OK)
 
-class OrderArchiveView(APIView):
-    permission_classes = [IsAuthenticated]
-    def patch(self, request, order_id):
-        try:
-            order = Order.objects.get(pk=order_id)
-        except Order.DoesNotExist:
-            return Response({'error': 'Order not found.'}, status=status.HTTP_404_NOT_FOUND)
+    @action(detail=True, methods=['patch'])
+    def archive(self, request, order_id=None):
+        order = self.get_object()
         user = request.user
         is_admin = user.is_admin() if hasattr(user, 'is_admin') else (user.role == 'admin')
         is_order_owner = (order.user_id == user)
@@ -82,19 +74,17 @@ class OrderArchiveView(APIView):
         order.save(update_fields=['is_archived', 'updated_at'])
         return Response(OrderSerializer(order).data, status=status.HTTP_200_OK)
 
-class OrderDetailView(generics.RetrieveUpdateDestroyAPIView):
-    queryset = Order.objects.all()
-    serializer_class = OrderSerializer
-    lookup_field = 'order_id'
-    def get_object(self):
-        order_number = self.kwargs.get('order_number')
-        if order_number:
-            return Order.objects.get(order_number=order_number)
-        return super().get_object()
+    @action(detail=False, methods=['delete'])
+    def delete_all(self, request):
+        Order.objects.all().delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
-class OrderItemPostListCreate(generics.ListCreateAPIView):
+class OrderItemViewSet(viewsets.ModelViewSet):
     queryset = OrderItem.objects.all()
     serializer_class = OrderItemSerializer
-    def delete(self, request, *args, **kwargs):
+    permission_classes = [IsAuthenticated]
+
+    @action(detail=False, methods=['delete'])
+    def delete_all(self, request):
         OrderItem.objects.all().delete()
         return Response(status=status.HTTP_204_NO_CONTENT)

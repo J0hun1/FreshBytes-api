@@ -37,8 +37,9 @@ class CartViewSet(viewsets.ViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-    @action(detail=False, methods=['post'])
+    @action(detail=False, methods=['patch'])
     def update_item(self, request):
+        """Update the quantity of a cart item (RESTful: PATCH)."""
         product_id = request.data.get('product_id')
         quantity = int(request.data.get('quantity', 0))
         try:
@@ -52,13 +53,15 @@ class CartViewSet(viewsets.ViewSet):
                 status=status.HTTP_404_NOT_FOUND
             )
 
-    @action(detail=False, methods=['post'])
+    @action(detail=False, methods=['delete'])
     def remove_item(self, request):
+        """Remove a cart item (RESTful: DELETE)."""
         product_id = request.data.get('product_id')
         remove_from_cart(request.user, product_id)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(detail=False, methods=['post'])
     def clear(self, request):
+        """Clear all items from the cart (POST is acceptable for this custom action)."""
         clear_cart(request.user)
         return Response(status=status.HTTP_204_NO_CONTENT)
