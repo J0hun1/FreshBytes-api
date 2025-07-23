@@ -1,4 +1,5 @@
-from rest_framework import generics, status
+from rest_framework import viewsets, status, generics
+from rest_framework.decorators import action
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny, BasePermission
@@ -43,38 +44,45 @@ class LogoutView(APIView):
         except Exception:
             return Response({"error": "Invalid token."}, status=status.HTTP_400_BAD_REQUEST)
 
-class UserPostListCreate(generics.ListCreateAPIView):
-    queryset = User.objects.all()
-    serializer_class = UserSerializer
-    permission_classes = [IsAuthenticated, BasePermission]
-    def delete(self, request, *args, **kwargs):
-        if not (request.user.role == 'admin'):
-            return Response({"error": "Only admins can perform this action."}, status=status.HTTP_403_FORBIDDEN)
-        User.objects.all().delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
-
-class UserPostRetrieveUpdateDestroy(generics.RetrieveUpdateDestroyAPIView):
+class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
     serializer_class = UserSerializer
     permission_classes = [IsAuthenticated]
     lookup_field = "pk"
-    def get_permissions(self):
-        if self.request.method in ['DELETE']:
-            return [IsAuthenticated(), BasePermission()]
-        return [IsAuthenticated()]
+
     def get_queryset(self):
         user = self.request.user
-        if user.role == 'admin':
-            return User.objects.all()
-        return User.objects.filter(user_id=user.user_id)
+        if self.action in ["list", "retrieve", "update", "partial_update", "destroy"]:
+            if user.role == 'admin':
+                return User.objects.all()
+            return User.objects.filter(user_id=user.user_id)
+        return super().get_queryset()
+
     def perform_destroy(self, instance):
         instance.is_deleted = True
         instance.is_active = False
         instance.save()
 
-class RestoreUser(APIView):
-    permission_classes = [IsAuthenticated, BasePermission]
-    def post(self, request, pk):
+    @action(detail=True, methods=['post'])
+    def enable(self, request, pk=None):
+        user = get_object_or_404(User, pk=pk, is_deleted=False)
+        if user.is_active:
+            return Response({"detail": "User already active."}, status=400)
+        user.is_active = True
+        user.save(update_fields=["is_active"])
+        return Response(UserSerializer(user).data, status=200)
+
+    @action(detail=True, methods=['post'])
+    def disable(self, request, pk=None):
+        user = get_object_or_404(User, pk=pk, is_deleted=False)
+        if not user.is_active:
+            return Response({"detail": "User already inactive."}, status=400)
+        user.is_active = False
+        user.save(update_fields=["is_active"])
+        return Response({"detail": "User disabled."}, status=200)
+
+    @action(detail=True, methods=['post'])
+    def restore(self, request, pk=None):
         try:
             user = User.objects.get(pk=pk, is_deleted=True)
         except User.DoesNotExist:
@@ -84,35 +92,16 @@ class RestoreUser(APIView):
         user.save(update_fields=["is_deleted", "is_active"])
         return Response(UserSerializer(user).data, status=status.HTTP_200_OK)
 
-class DisableUser(APIView):
-    permission_classes = [IsAuthenticated, BasePermission]
-    def post(self, request, pk):
-        user = get_object_or_404(User, pk=pk, is_deleted=False)
-        if not user.is_active:
-            return Response({"detail": "User already inactive."}, status=400)
-        user.is_active = False
-        user.save(update_fields=["is_active"])
-        return Response({"detail": "User disabled."}, status=200)
-
-class EnableUser(APIView):
-    permission_classes = [IsAuthenticated, BasePermission]
-    def post(self, request, pk):
-        user = get_object_or_404(User, pk=pk, is_deleted=False)
-        if user.is_active:
-            return Response({"detail": "User already active."}, status=400)
-        user.is_active = True
-        user.save(update_fields=["is_active"])
-        return Response(UserSerializer(user).data, status=200)
-
-class DeletedUsersListDelete(generics.ListAPIView):
-    serializer_class = UserSerializer
-    permission_classes = [IsAuthenticated, BasePermission]
-    def get_queryset(self):
-        return User.objects.filter(is_deleted=True)
-    def delete(self, request, *args, **kwargs):
-        count = User.objects.filter(is_deleted=True).count()
-        User.objects.filter(is_deleted=True).delete()
-        return Response({"deleted": count}, status=status.HTTP_204_NO_CONTENT)
+    @action(detail=False, methods=['get', 'delete'])
+    def deleted(self, request):
+        if request.method == 'GET':
+            users = User.objects.filter(is_deleted=True)
+            serializer = self.get_serializer(users, many=True)
+            return Response(serializer.data)
+        elif request.method == 'DELETE':
+            count = User.objects.filter(is_deleted=True).count()
+            User.objects.filter(is_deleted=True).delete()
+            return Response({"deleted": count}, status=status.HTTP_204_NO_CONTENT)
 
 class DeletedUserRetrieveDestroy(generics.RetrieveDestroyAPIView):
     serializer_class = UserSerializer

@@ -5,6 +5,8 @@ from rest_framework.routers import DefaultRouter
 
 router = DefaultRouter()
 router.register(r'products', views.ProductViewSet, basename='product')
+router.register(r'carts', views.CartViewSet, basename='cart')
+router.register(r'users', views.UserViewSet, basename='user')
 
 urlpatterns = [
     # ========================================
@@ -40,15 +42,7 @@ urlpatterns = [
     # ========================================
     # USER MANAGEMENT ENDPOINTS
     # ========================================
-    # Deleted users endpoints must come first to avoid catching 'deleted' as pk
-    path("users/deleted/", views.DeletedUsersListDelete.as_view(), name="deleted-users"),  # List all soft-deleted users
-    path("users/deleted/<uuid:pk>/", views.DeletedUserRetrieveDestroy.as_view(), name="deleted-user-detail"),  # Get or permanently delete specific deleted user
-    # Regular users endpoints
-    path("users/", views.UserPostListCreate.as_view(), name="users"),  # List all users or create new user (admin only)
-    path("users/<uuid:pk>/", views.UserPostRetrieveUpdateDestroy.as_view(), name="user-detail"),  # Get, update, or delete specific user
-    path("users/restore/<uuid:pk>/", views.RestoreUser.as_view(), name="user-restore"),  # Restore soft-deleted user (admin only)
-    path("users/disable/<uuid:pk>/", views.DisableUser.as_view(), name="user-disable"),  # Disable user account (admin only)
-    path("users/enable/<uuid:pk>/", views.EnableUser.as_view(), name="user-enable"),  # Enable disabled user account (admin only)
+    # User endpoints are now handled by the router
 
     # ========================================
     # SELLER MANAGEMENT ENDPOINTS

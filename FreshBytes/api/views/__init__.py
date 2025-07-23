@@ -1,8 +1,7 @@
 from .product import ProductViewSet
 
 from .user import (
-    CustomTokenObtainPairView, RegisterView, LogoutView, UserPostListCreate, UserPostRetrieveUpdateDestroy,
-    RestoreUser, DisableUser, EnableUser, DeletedUsersListDelete, DeletedUserRetrieveDestroy,
+    CustomTokenObtainPairView, RegisterView, LogoutView, UserViewSet, DeletedUserRetrieveDestroy,
     UserPermissionsView, UserRoleCheckView, AdminDashboardView
 )
 from .order import (
