@@ -161,22 +161,3 @@ class UserPermissionsView(APIView):
             'user_id': str(request.user.user_id),
             'checked_at': timezone.now().isoformat()
         })
-
-class UserRoleCheckView(APIView):
-    permission_classes = [IsAuthenticated]
-    def post(self, request):
-        roles = request.data.get('roles', [])
-        if not isinstance(roles, list):
-            roles = [roles]
-        user = request.user
-        role_results = {}
-        for role in roles:
-            role_results[role] = user.has_role(role)
-        return Response({
-            'user_id': str(user.user_id),
-            'current_role': user.role,
-            'primary_role': user.get_primary_role(),
-            'groups': [group.name for group in user.groups.all()],
-            'role_checks': role_results,
-            'has_any_role': any(role_results.values())
-        })

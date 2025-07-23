@@ -7,6 +7,7 @@ router = DefaultRouter()
 router.register(r'products', views.ProductViewSet, basename='product')
 router.register(r'carts', views.CartViewSet, basename='cart')
 router.register(r'users', views.UserViewSet, basename='user')
+router.register(r'sellers', views.SellerViewSet, basename='seller')
 
 urlpatterns = [
     # ========================================
@@ -20,7 +21,6 @@ urlpatterns = [
     
     # Permission and role checking endpoints
     path("auth/permissions/", views.UserPermissionsView.as_view(), name="user_permissions"),  # Get user's permissions and roles
-    path("auth/check-roles/", views.UserRoleCheckView.as_view(), name="check_roles"),  # Check if user has specific roles
 
     # ========================================
     # PRODUCT MANAGEMENT ENDPOINTS
