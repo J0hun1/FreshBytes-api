@@ -10,11 +10,14 @@ from django.utils import timezone
 from ..models import User
 from ..serializers import UserSerializer, CustomTokenObtainPairSerializer
 from ..permissions import IsAdmin, IsSeller, IsCustomer
+from drf_spectacular.utils import extend_schema, extend_schema_view
+
 
 class CustomTokenObtainPairView(TokenObtainPairView):
     permission_classes = [AllowAny]
     serializer_class = CustomTokenObtainPairSerializer
 
+@extend_schema(tags=['AdminDashboard'])
 class AdminDashboardView(APIView):
     permission_classes = [IsAuthenticated, IsAdmin]
     
@@ -28,12 +31,13 @@ class AdminDashboardView(APIView):
             }
         }
         return Response(data)
-
+@extend_schema(tags=['UserRegister'])
 class RegisterView(generics.CreateAPIView):
     permission_classes = [AllowAny]
     queryset = User.objects.all()
     serializer_class = UserSerializer
 
+@extend_schema(tags=['UserLogout'])
 class LogoutView(APIView):
     permission_classes = [IsAuthenticated]
     def post(self, request):
@@ -45,6 +49,8 @@ class LogoutView(APIView):
         except Exception:
             return Response({"error": "Invalid token."}, status=status.HTTP_400_BAD_REQUEST)
 
+
+@extend_schema(tags=['User'])
 class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
     serializer_class = UserSerializer
@@ -104,6 +110,7 @@ class UserViewSet(viewsets.ModelViewSet):
             User.objects.filter(is_deleted=True).delete()
             return Response({"deleted": count}, status=status.HTTP_204_NO_CONTENT)
 
+@extend_schema(tags=['UserDeleted'])
 class DeletedUserRetrieveDestroy(generics.RetrieveDestroyAPIView):
     serializer_class = UserSerializer
     permission_classes = [IsAuthenticated, BasePermission]
@@ -111,6 +118,7 @@ class DeletedUserRetrieveDestroy(generics.RetrieveDestroyAPIView):
     def get_queryset(self):
         return User.objects.filter(is_deleted=True)
 
+@extend_schema(tags=['UserPermissions'])
 class UserPermissionsView(APIView):
     permission_classes = [IsAuthenticated, IsAdmin]
     def get(self, request):

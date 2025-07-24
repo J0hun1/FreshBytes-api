@@ -7,6 +7,9 @@ from django.shortcuts import get_object_or_404
 from ..models import Cart, CartItem, Product
 from ..serializers import CartSerializer, CartItemSerializer
 from ..services.cart_services import get_or_create_cart, add_to_cart, update_cart_item, remove_from_cart, clear_cart
+from drf_spectacular.utils import extend_schema, extend_schema_view
+
+@extend_schema(tags=['Cart'])
 
 class CartViewSet(viewsets.ViewSet):
     permission_classes = [IsAuthenticated]

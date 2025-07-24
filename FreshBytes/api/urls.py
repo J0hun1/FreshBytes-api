@@ -2,6 +2,7 @@ from django.urls import path
 from . import views
 from rest_framework_simplejwt.views import TokenRefreshView
 from rest_framework.routers import DefaultRouter
+from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView, SpectacularRedocView
 
 router = DefaultRouter()
 router.register(r'products', views.ProductViewSet, basename='product')
@@ -22,6 +23,7 @@ urlpatterns = [
     # ========================================
     # JWT token-based authentication
     path("auth/login/", views.CustomTokenObtainPairView.as_view(), name="token_obtain_pair"),  # Login and get JWT tokens
+
     path("auth/login/refresh/", TokenRefreshView.as_view(), name="token_refresh"),  # Refresh expired JWT token
     path("auth/register/", views.RegisterView.as_view(), name="auth_register"),  # Register new user account
     path("auth/logout/", views.LogoutView.as_view(), name="auth_logout"),  # Logout and blacklist token
@@ -34,4 +36,9 @@ urlpatterns = [
     # ========================
     path("admin/dashboard/", views.AdminDashboardView.as_view(), name="admin-dashboard"),
     *router.urls,
+
+    # Swagger documentation endpoints
+    path('schema/', SpectacularAPIView.as_view(), name='schema'),
+    path('swagger/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
+    path('redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
 ]

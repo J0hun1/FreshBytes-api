@@ -4,6 +4,9 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from ..models import Promo, Product, Seller
 from ..serializers import PromoSerializer, ProductSerializer
+from drf_spectacular.utils import extend_schema, extend_schema_view
+
+@extend_schema(tags=['Promo'])
 
 class PromoViewSet(viewsets.ModelViewSet):
     queryset = Promo.objects.all()

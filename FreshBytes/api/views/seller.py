@@ -5,6 +5,10 @@ from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
 from ..models import Seller, Product, User
 from ..serializers import SellerSerializer, ProductSerializer, UserSerializer, OrderSerializer
+from drf_spectacular.utils import extend_schema, extend_schema_view
+
+
+@extend_schema(tags=['Seller'])
 
 class SellerViewSet(viewsets.ModelViewSet):
     queryset = Seller.objects.all()

@@ -3,6 +3,9 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from ..models import SubCategory
 from ..serializers import SubCategorySerializer
+from drf_spectacular.utils import extend_schema, extend_schema_view
+
+@extend_schema(tags=['SubCategory'])
 
 class SubCategoryViewSet(viewsets.ModelViewSet):
     queryset = SubCategory.objects.all()

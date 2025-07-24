@@ -3,6 +3,9 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from ..models import Reviews
 from ..serializers import ReviewsSerializer
+from drf_spectacular.utils import extend_schema, extend_schema_view
+
+@extend_schema(tags=['Reviews'])
 
 class ReviewsViewSet(viewsets.ModelViewSet):
     queryset = Reviews.objects.all()

@@ -7,6 +7,9 @@ from ..models import Order, OrderItem
 from ..serializers import OrderSerializer, OrderItemSerializer
 from ..services.order_services import create_order_from_cart
 from ..services.seller_services import update_seller_stats_on_order_delivered
+from drf_spectacular.utils import extend_schema, extend_schema_view
+
+@extend_schema(tags=['Order'])
 
 class OrderViewSet(viewsets.ModelViewSet):
     queryset = Order.objects.all()
@@ -78,6 +81,9 @@ class OrderViewSet(viewsets.ModelViewSet):
     def delete_all(self, request):
         Order.objects.all().delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+@extend_schema(tags=['OrderItem'])
 
 class OrderItemViewSet(viewsets.ModelViewSet):
     queryset = OrderItem.objects.all()
