@@ -21,6 +21,18 @@ class UserSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({"password": "This field is required."})
         return super().validate(attrs)
 
+    def validate_role(self, value):
+        request = self.context.get('request')
+        # Only allow superusers to change the role
+        if request and request.user and not request.user.is_superuser:
+            # If updating and trying to change the role
+            if self.instance and value != self.instance.role:
+                raise serializers.ValidationError("You do not have permission to change roles.")
+            # If creating and trying to set a role other than default
+            if not self.instance and value != 'customer':
+                raise serializers.ValidationError("You do not have permission to assign this role.")
+        return value
+
     def create(self, validated_data):
         # `password` is guaranteed present here (see validate).
         validated_data['password'] = make_password(validated_data.get('password'))

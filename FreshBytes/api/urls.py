@@ -37,6 +37,12 @@ urlpatterns = [
     path("admin/dashboard/", views.AdminDashboardView.as_view(), name="admin-dashboard"),
     *router.urls,
 
+    # ========================
+    # STORE DASHBOARD ENDPOINT
+    # ========================
+    path("store/dashboard/", views.StoreDashboardView.as_view(), name="store-dashboard"),
+    *router.urls,
+
     # Swagger documentation endpoints
     path('schema/', SpectacularAPIView.as_view(), name='schema'),
     path('swagger/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),

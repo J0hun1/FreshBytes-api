@@ -21,16 +21,20 @@ class CustomTokenObtainPairView(TokenObtainPairView):
 class AdminDashboardView(APIView):
     permission_classes = [IsAuthenticated, IsAdmin]
     
-
     def get(self, request):
-        # Example admin data
         data = {
             "message": "Welcome, admin!",
-            "stats": {
-                # ... your admin dashboard data here ...
-            }
         }
         return Response(data)
+    
+class StoreDashboardView(APIView):
+    permission_classes = [IsAuthenticated, IsSeller]
+
+    def get(self, request):
+        # Return store dashboard data
+        return Response({"message": "Welcome, store user!"})
+
+
 @extend_schema(tags=['UserRegister'])
 class RegisterView(generics.CreateAPIView):
     permission_classes = [AllowAny]
@@ -109,6 +113,20 @@ class UserViewSet(viewsets.ModelViewSet):
             count = User.objects.filter(is_deleted=True).count()
             User.objects.filter(is_deleted=True).delete()
             return Response({"deleted": count}, status=status.HTTP_204_NO_CONTENT)
+
+    def update(self, request, *args, **kwargs):
+        # View-level restriction: Only superusers can change the role
+        if 'role' in request.data:
+            if not request.user.is_superuser:
+                return Response({'detail': 'You do not have permission to change roles.'}, status=status.HTTP_403_FORBIDDEN)
+        return super().update(request, *args, **kwargs)
+
+    def partial_update(self, request, *args, **kwargs):
+        # View-level restriction: Only superusers can change the role
+        if 'role' in request.data:
+            if not request.user.is_superuser:
+                return Response({'detail': 'You do not have permission to change roles.'}, status=status.HTTP_403_FORBIDDEN)
+        return super().partial_update(request, *args, **kwargs)
 
 @extend_schema(tags=['UserDeleted'])
 class DeletedUserRetrieveDestroy(generics.RetrieveDestroyAPIView):
