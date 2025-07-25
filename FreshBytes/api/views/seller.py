@@ -11,7 +11,7 @@ from drf_spectacular.utils import extend_schema, extend_schema_view
 @extend_schema(tags=['Seller'])
 
 class SellerViewSet(viewsets.ModelViewSet):
-    queryset = Seller.objects.all()
+    queryset = Seller.objects.all()  
     serializer_class = SellerSerializer
     permission_classes = [IsAuthenticated]
 

@@ -44,8 +44,9 @@ class User(AbstractBaseUser, PermissionsMixin):
     user_name = models.CharField(max_length=255)
     first_name = models.CharField(max_length=255)
     last_name = models.CharField(max_length=255)
-    user_email = models.EmailField(unique=True, null=True)
+    user_email = models.EmailField(unique=True, null=False, default="")
     password = models.CharField(max_length=128, null=True)
+    profile_picture = models.ImageField(upload_to='profile_pictures/', null=True, blank=True)
     user_phone = models.CharField(max_length=255)
     street = models.CharField(max_length=255, blank=True, null=True)
     barangay = models.CharField(max_length=255, blank=True, null=True)
@@ -55,11 +56,13 @@ class User(AbstractBaseUser, PermissionsMixin):
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='customer')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
     is_superuser = models.BooleanField(default=False)
     is_deleted = models.BooleanField(default=False)
+    terms_accepted = models.BooleanField(default=False)
+    phone_verified = models.BooleanField(default=False)
+    email_verified = models.BooleanField(default=False)
 
     objects = UserManager()
 

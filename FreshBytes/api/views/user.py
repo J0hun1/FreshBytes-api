@@ -114,6 +114,15 @@ class UserViewSet(viewsets.ModelViewSet):
             User.objects.filter(is_deleted=True).delete()
             return Response({"deleted": count}, status=status.HTTP_204_NO_CONTENT)
 
+    @action(detail=True, methods=['delete'], url_path='hard-delete')
+    def hard_delete(self, request, pk=None):
+        try:
+            user = User.objects.get(pk=pk, is_deleted=True)
+        except User.DoesNotExist:
+            return Response({"error": "User not found or not soft-deleted."}, status=status.HTTP_404_NOT_FOUND)
+        user.delete()
+        return Response({"detail": f"User {pk} permanently deleted."}, status=status.HTTP_204_NO_CONTENT)
+
     def update(self, request, *args, **kwargs):
         # View-level restriction: Only superusers can change the role
         if 'role' in request.data:
@@ -128,13 +137,6 @@ class UserViewSet(viewsets.ModelViewSet):
                 return Response({'detail': 'You do not have permission to change roles.'}, status=status.HTTP_403_FORBIDDEN)
         return super().partial_update(request, *args, **kwargs)
 
-@extend_schema(tags=['UserDeleted'])
-class DeletedUserRetrieveDestroy(generics.RetrieveDestroyAPIView):
-    serializer_class = UserSerializer
-    permission_classes = [IsAuthenticated, BasePermission]
-    lookup_field = "pk"
-    def get_queryset(self):
-        return User.objects.filter(is_deleted=True)
 
 @extend_schema(tags=['UserPermissions'])
 class UserPermissionsView(APIView):

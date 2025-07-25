@@ -22,24 +22,23 @@ urlpatterns = [
     # AUTHENTICATION & AUTHORIZATION ENDPOINTS
     # ========================================
     # JWT token-based authentication
-    path("auth/login/", views.CustomTokenObtainPairView.as_view(), name="token_obtain_pair"),  # Login and get JWT tokens
-
-    path("auth/login/refresh/", TokenRefreshView.as_view(), name="token_refresh"),  # Refresh expired JWT token
-    path("auth/register/", views.RegisterView.as_view(), name="auth_register"),  # Register new user account
-    path("auth/logout/", views.LogoutView.as_view(), name="auth_logout"),  # Logout and blacklist token
+    path("auth/login/", views.CustomTokenObtainPairView.as_view(), name="token_obtain_pair"),  
+    # Refresh expired JWT token
+    path("auth/login/refresh/", TokenRefreshView.as_view(), name="token_refresh"),  
+    # Register new user account
+    path("auth/register/", views.RegisterView.as_view(), name="auth_register"),  
+    # Logout and blacklist token
+    path("auth/logout/", views.LogoutView.as_view(), name="auth_logout"),  
     
     # Permission and role checking endpoints
-    path("auth/permissions/", views.UserPermissionsView.as_view(), name="user_permissions"),  # Get user's permissions and roles
+    path("auth/permissions/", views.UserPermissionsView.as_view(), name="user_permissions"),  
 
-    # ========================
-    # ADMIN DASHBOARD ENDPOINT
-    # ========================
+    # Admin dashboard
     path("admin/dashboard/", views.AdminDashboardView.as_view(), name="admin-dashboard"),
     *router.urls,
 
-    # ========================
-    # STORE DASHBOARD ENDPOINT
-    # ========================
+
+    # Store dashboard
     path("store/dashboard/", views.StoreDashboardView.as_view(), name="store-dashboard"),
     *router.urls,
 

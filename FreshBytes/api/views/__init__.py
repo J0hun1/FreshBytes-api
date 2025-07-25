@@ -1,6 +1,6 @@
 from .product import ProductViewSet
 from .user import (
-    CustomTokenObtainPairView, RegisterView, LogoutView, UserViewSet, DeletedUserRetrieveDestroy,
+    CustomTokenObtainPairView, RegisterView, LogoutView, UserViewSet,
     UserPermissionsView, AdminDashboardView, StoreDashboardView
 )
 from .order import  OrderViewSet, OrderItemViewSet
