@@ -11,6 +11,7 @@ from ..models import User
 from ..serializers import UserSerializer, CustomTokenObtainPairSerializer
 from ..permissions import IsAdminGroup, IsSellerGroup, IsCustomerGroup
 from drf_spectacular.utils import extend_schema, extend_schema_view
+from rest_framework import serializers
 
 
 class CustomTokenObtainPairView(TokenObtainPairView):
@@ -41,7 +42,13 @@ class RegisterView(generics.CreateAPIView):
     queryset = User.objects.all()
     serializer_class = UserSerializer
 
-@extend_schema(tags=['UserLogout'])
+class LogoutRequestSerializer(serializers.Serializer):
+    refresh_token = serializers.CharField()
+
+@extend_schema(
+    request=LogoutRequestSerializer,
+    responses={200: serializers.Serializer()}
+)
 class LogoutView(APIView):
     permission_classes = [IsAuthenticated]
     def post(self, request):
@@ -136,6 +143,11 @@ class UserViewSet(viewsets.ModelViewSet):
             if not request.user.is_superuser:
                 return Response({'detail': 'You do not have permission to change roles.'}, status=status.HTTP_403_FORBIDDEN)
         return super().partial_update(request, *args, **kwargs)
+
+    @action(detail=False, methods=['get'], url_path='me', permission_classes=[IsAuthenticated])
+    def me(self, request):
+        serializer = self.get_serializer(request.user)
+        return Response(serializer.data)
 
 
 @extend_schema(tags=['UserPermissions'])
