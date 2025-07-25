@@ -21,9 +21,9 @@ def calculate_order_item_total(product, quantity):
     return product_price * quantity 
 
 from django.db import transaction
-from ..models import Cart, CartItem, Order, OrderItem, Product
+from ..models import Cart, CartItem, Order, OrderItem, Product, Payment
 
-def create_order_from_cart(user, cart_item_ids=None):
+def create_order_from_cart(user, cart_item_ids=None, payment_method=None):
     with transaction.atomic():
         cart = Cart.objects.get(user=user)
         if cart_item_ids:
@@ -57,7 +57,17 @@ def create_order_from_cart(user, cart_item_ids=None):
             item.product.quantity -= item.quantity
             item.product.save()
 
+        # Create payment
+        if not payment_method:
+            raise ValueError("Payment method is required.")
+        payment = Payment.objects.create(
+            order_id=order,
+            payment_method=payment_method,
+            payment_status='PENDING',
+            amount=order_total,
+        )
+
         # Remove ordered items from cart
         items.delete()
 
-        return order 
+        return order, payment 

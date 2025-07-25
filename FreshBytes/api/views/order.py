@@ -4,7 +4,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
 from ..models import Order, OrderItem
-from ..serializers import OrderSerializer, OrderItemSerializer
+from ..serializers import OrderSerializer, OrderItemSerializer, PaymentSerializer
 from ..services.order_services import create_order_from_cart
 from ..services.seller_services import update_seller_stats_on_order_delivered
 from drf_spectacular.utils import extend_schema, extend_schema_view
@@ -26,11 +26,23 @@ class OrderViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['post'])
     def checkout(self, request):
         cart_item_ids = request.data.get('cart_item_ids', None)
+        payment_method = request.data.get('payment_method', None)
         try:
-            order = create_order_from_cart(request.user, cart_item_ids)
-            return Response(OrderSerializer(order).data, status=status.HTTP_201_CREATED)
+            order, payment = create_order_from_cart(request.user, cart_item_ids, payment_method)
+            return Response({
+                "order": OrderSerializer(order).data,
+                "payment": PaymentSerializer(payment).data
+            }, status=status.HTTP_201_CREATED)
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    ALLOWED_TRANSITIONS = {
+        'PENDING': ['CONFIRMED', 'CANCELLED'],
+        'CONFIRMED': ['SHIPPED', 'CANCELLED'],
+        'SHIPPED': ['DELIVERED'],
+        'DELIVERED': [],
+        'CANCELLED': [],
+    }
 
     @action(detail=True, methods=['patch'])
     def update_status(self, request, order_id=None):
@@ -46,6 +58,10 @@ class OrderViewSet(viewsets.ModelViewSet):
         allowed_statuses = [choice[0] for choice in Order._meta.get_field('order_status').choices]
         if new_status not in allowed_statuses:
             return Response({'error': f'Invalid status. Allowed: {allowed_statuses}'}, status=status.HTTP_400_BAD_REQUEST)
+        old_status = order.order_status
+        # Enforce allowed transitions
+        if new_status not in self.ALLOWED_TRANSITIONS.get(old_status, []):
+            return Response({'error': f'Cannot change status from {old_status} to {new_status}.'}, status=status.HTTP_400_BAD_REQUEST)
         if is_order_owner and new_status == 'CANCELLED':
             if order.order_status == 'PENDING':
                 order.order_status = 'CANCELLED'
@@ -55,7 +71,6 @@ class OrderViewSet(viewsets.ModelViewSet):
                 return Response({'error': 'You can only cancel orders that are still PENDING.'}, status=status.HTTP_403_FORBIDDEN)
         if not (is_admin or is_seller):
             return Response({'error': 'Permission denied.'}, status=status.HTTP_403_FORBIDDEN)
-        old_status = order.order_status
         order.order_status = new_status
         order.save(update_fields=['order_status', 'updated_at'])
         if old_status != 'DELIVERED' and new_status == 'DELIVERED':
@@ -77,10 +92,14 @@ class OrderViewSet(viewsets.ModelViewSet):
         order.save(update_fields=['is_archived', 'updated_at'])
         return Response(OrderSerializer(order).data, status=status.HTTP_200_OK)
 
-    @action(detail=False, methods=['delete'])
-    def delete_all(self, request):
-        Order.objects.all().delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
+    @action(detail=False, methods=['get'], url_path='archived')
+    def archived_orders(self, request):
+        archived = Order.objects.filter(is_archived=True)
+        serializer = self.get_serializer(archived, many=True)
+        return Response(serializer.data)
+
+    def destroy(self, request, *args, **kwargs):
+        return Response({'detail': 'Order deletion is not allowed.'}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
 
 
 @extend_schema(tags=['OrderItem'])
