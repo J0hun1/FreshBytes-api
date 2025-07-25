@@ -9,7 +9,7 @@ from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from ..models import User
 from ..serializers import UserSerializer, CustomTokenObtainPairSerializer
-from ..permissions import IsAdmin, IsSeller, IsCustomer
+from ..permissions import IsAdminGroup, IsSellerGroup, IsCustomerGroup
 from drf_spectacular.utils import extend_schema, extend_schema_view
 
 
@@ -19,7 +19,7 @@ class CustomTokenObtainPairView(TokenObtainPairView):
 
 @extend_schema(tags=['AdminDashboard'])
 class AdminDashboardView(APIView):
-    permission_classes = [IsAuthenticated, IsAdmin]
+    permission_classes = [IsAuthenticated, IsAdminGroup]
     
     def get(self, request):
         data = {
@@ -28,7 +28,7 @@ class AdminDashboardView(APIView):
         return Response(data)
     
 class StoreDashboardView(APIView):
-    permission_classes = [IsAuthenticated, IsSeller]
+    permission_classes = [IsAuthenticated, IsSellerGroup]
 
     def get(self, request):
         # Return store dashboard data
@@ -140,7 +140,7 @@ class UserViewSet(viewsets.ModelViewSet):
 
 @extend_schema(tags=['UserPermissions'])
 class UserPermissionsView(APIView):
-    permission_classes = [IsAuthenticated, IsAdmin]
+    permission_classes = [IsAuthenticated, IsAdminGroup]
     def get(self, request):
         user = request.user
         user_permissions = list(user.get_all_permissions())

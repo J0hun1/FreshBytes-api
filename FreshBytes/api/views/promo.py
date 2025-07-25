@@ -5,29 +5,30 @@ from rest_framework.permissions import IsAuthenticated
 from ..models import Promo, Product, Seller
 from ..serializers import PromoSerializer, ProductSerializer
 from drf_spectacular.utils import extend_schema, extend_schema_view
+from ..permissions import IsSellerGroup, IsAdminGroup
 
 @extend_schema(tags=['Promo'])
 
 class PromoViewSet(viewsets.ModelViewSet):
     queryset = Promo.objects.all()
     serializer_class = PromoSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsSellerGroup]
 
     def get_queryset(self):
         user = self.request.user
-        if user.role == 'seller':
+        if user.groups.filter(name='Seller').exists():
             return Promo.objects.filter(seller_id__user_id=user)
-        elif user.role == 'admin':
+        elif user.groups.filter(name='Admin').exists():
             return Promo.objects.all()
         else:
             return Promo.objects.filter(is_active=True)
 
     def perform_create(self, serializer):
-        try:
-            seller = Seller.objects.get(user_id=self.request.user)
-        except Seller.DoesNotExist:
+        user = self.request.user
+        if not user.groups.filter(name='Seller').exists():
             from rest_framework import serializers
             raise serializers.ValidationError({"error": "Only sellers can create promos. No seller profile found for this user."})
+        seller = Seller.objects.get(user_id=user)
         promo = serializer.save(seller_id=seller)
         product_ids = self.request.data.get('product_id', [])
         if isinstance(product_ids, str):
@@ -48,7 +49,8 @@ class PromoViewSet(viewsets.ModelViewSet):
 
     def perform_update(self, serializer):
         promo = self.get_object()
-        if self.request.user.role == 'seller' and promo.seller_id.user_id != self.request.user:
+        user = self.request.user
+        if user.groups.filter(name='Seller').exists() and promo.seller_id.user_id != user:
             from rest_framework import serializers
             raise serializers.ValidationError({"error": "You can only update your own promos."})
         promo = serializer.save()
@@ -56,10 +58,10 @@ class PromoViewSet(viewsets.ModelViewSet):
         if product_ids is not None:
             if isinstance(product_ids, str):
                 product_ids = [product_ids]
-            if self.request.user.role == 'seller':
+            if user.groups.filter(name='Seller').exists():
                 products = Product.objects.filter(
                     product_id__in=product_ids,
-                    seller_id__user_id=self.request.user
+                    seller_id__user_id=user
                 )
                 found_ids = set(str(p.product_id) for p in products)
                 requested_ids = set(product_ids)
@@ -94,11 +96,12 @@ class PromoViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['delete'])
     def delete_all(self, request):
+        user = request.user
         from ..services.promo_services import update_product_discounted_price
-        if request.user.role == 'admin':
+        if user.groups.filter(name='Admin').exists():
             promos_qs = Promo.objects.all()
-        elif request.user.role == 'seller':
-            promos_qs = Promo.objects.filter(seller_id__user_id=request.user)
+        elif user.groups.filter(name='Seller').exists():
+            promos_qs = Promo.objects.filter(seller_id__user_id=user)
         else:
             return Response({"error": "Only sellers can delete their own promos or admins can delete all promos."}, status=status.HTTP_403_FORBIDDEN)
         from django.db.models import Prefetch

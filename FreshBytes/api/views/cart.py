@@ -8,11 +8,12 @@ from ..models import Cart, CartItem, Product
 from ..serializers import CartSerializer, CartItemSerializer
 from ..services.cart_services import get_or_create_cart, add_to_cart, update_cart_item, remove_from_cart, clear_cart
 from drf_spectacular.utils import extend_schema, extend_schema_view
+from ..permissions import IsCustomerGroup
 
 @extend_schema(tags=['Cart'])
 
 class CartViewSet(viewsets.ViewSet):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsCustomerGroup]
     serializer_class = CartSerializer
 
     def list(self, request):

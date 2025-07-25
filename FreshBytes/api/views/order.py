@@ -8,6 +8,7 @@ from ..serializers import OrderSerializer, OrderItemSerializer, PaymentSerialize
 from ..services.order_services import create_order_from_cart
 from ..services.seller_services import update_seller_stats_on_order_delivered
 from drf_spectacular.utils import extend_schema, extend_schema_view
+from ..permissions import IsSellerGroup, IsAdminGroup
 
 @extend_schema(tags=['Order'])
 
@@ -44,11 +45,11 @@ class OrderViewSet(viewsets.ModelViewSet):
         'CANCELLED': [],
     }
 
-    @action(detail=True, methods=['patch'])
+    @action(detail=True, methods=['patch'], permission_classes=[IsAuthenticated, IsSellerGroup, IsAdminGroup])
     def update_status(self, request, order_id=None):
         order = self.get_object()
         user = request.user
-        is_admin = user.is_admin() if hasattr(user, 'is_admin') else (user.role == 'admin')
+        is_admin = user.groups.filter(name='Admin').exists()
         is_order_owner = (order.user_id == user)
         is_seller = False
         if hasattr(user, 'seller_profile'):
@@ -77,11 +78,11 @@ class OrderViewSet(viewsets.ModelViewSet):
             update_seller_stats_on_order_delivered(order)
         return Response(OrderSerializer(order).data, status=status.HTTP_200_OK)
 
-    @action(detail=True, methods=['patch'])
+    @action(detail=True, methods=['patch'], permission_classes=[IsAuthenticated, IsSellerGroup, IsAdminGroup])
     def archive(self, request, order_id=None):
         order = self.get_object()
         user = request.user
-        is_admin = user.is_admin() if hasattr(user, 'is_admin') else (user.role == 'admin')
+        is_admin = user.groups.filter(name='Admin').exists()
         is_order_owner = (order.user_id == user)
         if not (is_admin or is_order_owner):
             return Response({'error': 'Permission denied.'}, status=status.HTTP_403_FORBIDDEN)

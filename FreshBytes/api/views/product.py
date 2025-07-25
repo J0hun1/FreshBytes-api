@@ -4,12 +4,15 @@ from rest_framework.response import Response
 from ..models import Product
 from ..serializers import ProductSerializer
 from drf_spectacular.utils import extend_schema
+from rest_framework.permissions import IsAuthenticated
+from ..permissions import IsSellerGroup
 
 @extend_schema(tags=['Product'])
 
 class ProductViewSet(viewsets.ModelViewSet):
     queryset = Product.objects.all()
     serializer_class = ProductSerializer
+    permission_classes = [IsAuthenticated]
     # Industry-standard query parameter support:
     # Filtering: product_price, seller_id, is_deleted, is_active, product_name
     # Searching: product_name
@@ -19,7 +22,7 @@ class ProductViewSet(viewsets.ModelViewSet):
     ordering_fields = ['product_price', 'created_at']
     ordering = ['-created_at']  # Default ordering: newest first
 
-    @action(detail=True, methods=['patch'])
+    @action(detail=True, methods=['patch'], permission_classes=[IsAuthenticated, IsSellerGroup])
     def soft_delete(self, request, pk=None):
         product = self.get_object()
         if product.is_deleted:
@@ -28,7 +31,7 @@ class ProductViewSet(viewsets.ModelViewSet):
         product.save()
         return Response({'detail': 'Product soft-deleted.'}, status=status.HTTP_200_OK)
 
-    @action(detail=True, methods=['patch'])
+    @action(detail=True, methods=['patch'], permission_classes=[IsAuthenticated, IsSellerGroup])
     def restore(self, request, pk=None):
         product = self.get_object()
         if not product.is_deleted:
@@ -37,7 +40,7 @@ class ProductViewSet(viewsets.ModelViewSet):
         product.save()
         return Response({'detail': 'Product restored.'}, status=status.HTTP_200_OK)
 
-    @action(detail=False, methods=['get'])
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated, IsSellerGroup])
     def deleted(self, request):
         deleted_products = Product.all_objects.filter(is_deleted=True)
         data = ProductSerializer(deleted_products, many=True).data
