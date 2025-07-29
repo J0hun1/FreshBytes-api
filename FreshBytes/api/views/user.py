@@ -8,7 +8,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from ..models import User
-from ..serializers import UserSerializer, CustomTokenObtainPairSerializer
+from ..serializers import UserSerializer, UserListSerializer, CustomTokenObtainPairSerializer
 from ..permissions import IsAdminGroup, IsSellerGroup, IsCustomerGroup
 from drf_spectacular.utils import extend_schema, extend_schema_view
 from rest_framework import serializers
@@ -72,6 +72,11 @@ class UserViewSet(viewsets.ModelViewSet):
     ordering_fields = ['created_at', 'user_name', 'role']
     ordering = ['-created_at', 'user_name', 'role']
 
+    def get_serializer_class(self):
+        if self.action == 'list':
+            return UserListSerializer
+        return UserSerializer
+
     def get_queryset(self):
         user = self.request.user
         if self.action in ["list", "retrieve", "update", "partial_update", "destroy"]:
@@ -133,6 +138,91 @@ class UserViewSet(viewsets.ModelViewSet):
             return Response({"error": "User not found or not soft-deleted."}, status=status.HTTP_404_NOT_FOUND)
         user.delete()
         return Response({"detail": f"User {pk} permanently deleted."}, status=status.HTTP_204_NO_CONTENT)
+
+    @action(detail=False, methods=['get'])
+    def stats(self, request):
+        """Get user statistics for dashboard"""
+        if not request.user.role == 'admin':
+            return Response({"error": "Admin access required"}, status=status.HTTP_403_FORBIDDEN)
+        
+        total_users = User.objects.count()
+        active_users = User.objects.filter(is_active=True, is_deleted=False).count()
+        inactive_users = User.objects.filter(is_active=False, is_deleted=False).count()
+        deleted_users = User.objects.filter(is_deleted=True).count()
+        
+        role_stats = {}
+        for role in ['admin', 'seller', 'customer']:
+            role_stats[role] = User.objects.filter(role=role, is_deleted=False).count()
+        
+        recent_users = User.objects.filter(
+            created_at__gte=timezone.now() - timezone.timedelta(days=30),
+            is_deleted=False
+        ).count()
+        
+        return Response({
+            "total_users": total_users,
+            "active_users": active_users,
+            "inactive_users": inactive_users,
+            "deleted_users": deleted_users,
+            "role_distribution": role_stats,
+            "recent_users_30_days": recent_users,
+            "generated_at": timezone.now().isoformat()
+        })
+
+    @action(detail=False, methods=['get'])
+    def bulk_actions(self, request):
+        """Get available bulk actions for the current user"""
+        if not request.user.role == 'admin':
+            return Response({"error": "Admin access required"}, status=status.HTTP_403_FORBIDDEN)
+        
+        return Response({
+            "available_actions": [
+                {"action": "enable", "label": "Enable Users", "method": "POST"},
+                {"action": "disable", "label": "Disable Users", "method": "POST"},
+                {"action": "delete", "label": "Delete Users", "method": "DELETE"},
+                {"action": "restore", "label": "Restore Users", "method": "POST"},
+            ]
+        })
+
+    @action(detail=False, methods=['post'])
+    def bulk_enable(self, request):
+        """Bulk enable users"""
+        if not request.user.role == 'admin':
+            return Response({"error": "Admin access required"}, status=status.HTTP_403_FORBIDDEN)
+        
+        user_ids = request.data.get('user_ids', [])
+        if not user_ids:
+            return Response({"error": "user_ids is required"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        updated_count = User.objects.filter(
+            user_id__in=user_ids, 
+            is_deleted=False
+        ).update(is_active=True)
+        
+        return Response({
+            "message": f"Enabled {updated_count} users",
+            "updated_count": updated_count
+        })
+
+    @action(detail=False, methods=['post'])
+    def bulk_disable(self, request):
+        """Bulk disable users"""
+        if not request.user.role == 'admin':
+            return Response({"error": "Admin access required"}, status=status.HTTP_403_FORBIDDEN)
+        
+        user_ids = request.data.get('user_ids', [])
+        if not user_ids:
+            return Response({"error": "user_ids is required"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        updated_count = User.objects.filter(
+            user_id__in=user_ids, 
+            is_deleted=False
+        ).update(is_active=False)
+        
+        return Response({
+            "message": f"Disabled {updated_count} users",
+            "updated_count": updated_count
+        })
 
     def update(self, request, *args, **kwargs):
         # View-level restriction: Only superusers can change the role

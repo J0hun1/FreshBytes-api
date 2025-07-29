@@ -1,6 +1,6 @@
 from .product import ProductSerializer
 from .category import CategorySerializer
-from .user import UserSerializer
+from .user import UserSerializer, UserListSerializer
 from .seller import SellerSerializer
 from .subcategory import SubCategorySerializer
 from .review import ReviewsSerializer
