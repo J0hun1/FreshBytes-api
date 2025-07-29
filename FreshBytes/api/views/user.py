@@ -67,6 +67,10 @@ class UserViewSet(viewsets.ModelViewSet):
     serializer_class = UserSerializer
     permission_classes = [IsAuthenticated]
     lookup_field = "pk"
+    filterset_fields = ['role', 'is_active', 'is_deleted', 'user_email', 'created_at', 'user_name', 'first_name', 'last_name']
+    search_fields = ['user_name', 'first_name', 'last_name', 'user_email']
+    ordering_fields = ['created_at', 'user_name', 'role']
+    ordering = ['-created_at', 'user_name', 'role']
 
     def get_queryset(self):
         user = self.request.user
