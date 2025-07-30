@@ -1,12 +1,17 @@
-django
-djangorestframework
-djangorestframework-simplejwt
-django-cors-headers
-django-filter
-psycopg
-psycopg2-binary
-Pillow
-django-redis
-environs
-django-extensions
-drf-spectacular
+# Core Django and DRF
+django>=5.1.7
+djangorestframework>=3.14.0
+djangorestframework-simplejwt>=5.3.0
+django-cors-headers>=4.3.1
+django-filter>=23.5
+Pillow>=10.1.0
+django-extensions>=3.2.3
+drf-spectacular>=0.27.0
+
+# Database (for production - currently using SQLite)
+psycopg>=3.1.13
+psycopg2-binary>=2.9.9
+
+# Development and Debugging
+django-extensions>=3.2.3
+
