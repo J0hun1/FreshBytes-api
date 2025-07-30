@@ -139,27 +139,27 @@ class UserSerializer(serializers.ModelSerializer):
         if not value:
             return value  # Allow empty for updates
         
-        # Check minimum length
-        if len(value) < 8:
-            raise serializers.ValidationError("Password must be at least 8 characters long.")
+        # # Check minimum length
+        # if len(value) < 8:
+        #     raise serializers.ValidationError("Password must be at least 8 characters long.")
         
-        # Check for complexity requirements
-        if not re.search(r'[A-Z]', value):
-            raise serializers.ValidationError("Password must contain at least one uppercase letter.")
+        # # Check for complexity requirements
+        # if not re.search(r'[A-Z]', value):
+        #     raise serializers.ValidationError("Password must contain at least one uppercase letter.")
         
-        if not re.search(r'[a-z]', value):
-            raise serializers.ValidationError("Password must contain at least one lowercase letter.")
+        # if not re.search(r'[a-z]', value):
+        #     raise serializers.ValidationError("Password must contain at least one lowercase letter.")
         
-        if not re.search(r'\d', value):
-            raise serializers.ValidationError("Password must contain at least one number.")
+        # if not re.search(r'\d', value):
+        #     raise serializers.ValidationError("Password must contain at least one number.")
         
-        if not re.search(r'[!@#$%^&*(),.?":{}|<>]', value):
-            raise serializers.ValidationError("Password must contain at least one special character.")
+        # if not re.search(r'[!@#$%^&*(),.?":{}|<>]', value):
+        #     raise serializers.ValidationError("Password must contain at least one special character.")
         
-        # Check for common weak passwords
-        weak_passwords = ['password', '123456', 'qwerty', 'admin', 'user']
-        if value.lower() in weak_passwords:
-            raise serializers.ValidationError("Please choose a stronger password.")
+        # # Check for common weak passwords
+        # weak_passwords = ['password', '123456', 'qwerty', 'admin', 'user']
+        # if value.lower() in weak_passwords:
+        #     raise serializers.ValidationError("Please choose a stronger password.")
         
         return value
 
@@ -260,10 +260,6 @@ class UserSerializer(serializers.ModelSerializer):
             # Terms must be accepted for new users
             if not attrs.get('terms_accepted', False):
                 raise serializers.ValidationError({"terms_accepted": "You must accept the terms to create an account."})
-            
-            # At least one verification method must be completed
-            if not (attrs.get('phone_verified', False) or attrs.get('email_verified', False)):
-                raise serializers.ValidationError({"verification": "Either phone or email must be verified to create an account."})
             
             # Set default role to customer for new users
             if not attrs.get('role'):

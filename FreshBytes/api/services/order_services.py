@@ -23,8 +23,27 @@ def calculate_order_item_total(product, quantity):
 from django.db import transaction
 from ..models import Cart, CartItem, Order, OrderItem, Product, Payment
 
+def validate_user_for_order(user):
+    """Validate that user can place an order"""
+    # Check if user has verified contact information
+    if not user.phone_verified and not user.email_verified:
+        raise ValueError("You must verify either your phone number or email address before placing an order.")
+    
+    # Check if user is active
+    if not user.is_active:
+        raise ValueError("Your account is inactive. Please contact support.")
+    
+    # Check if user is not deleted
+    if user.is_deleted:
+        raise ValueError("Your account has been deleted. Please contact support.")
+    
+    return True
+
 def create_order_from_cart(user, cart_item_ids=None, payment_method=None):
     with transaction.atomic():
+        # Validate user can place order
+        validate_user_for_order(user)
+        
         cart = Cart.objects.get(user=user)
         if cart_item_ids:
             items = cart.items.filter(cart_item_id__in=cart_item_ids)
