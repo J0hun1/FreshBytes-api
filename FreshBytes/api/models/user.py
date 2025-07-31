@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
+from django.core.exceptions import ValidationError
 import uuid
 
 class UserManager(BaseUserManager):
@@ -69,13 +70,48 @@ class User(AbstractBaseUser, PermissionsMixin):
     USERNAME_FIELD = 'user_email'
     REQUIRED_FIELDS = ['user_name', 'first_name', 'last_name']
 
+    def clean(self):
+        """Validate that is_active and is_deleted cannot both be True"""
+        super().clean()
+        if self.is_active and self.is_deleted:
+            raise ValidationError({
+                'is_active': 'A user cannot be both active and deleted.',
+                'is_deleted': 'A user cannot be both active and deleted.'
+            })
+
     def save(self, *args, **kwargs):
         from ..services.users_services import validate_user_role
+        
+        # Validate the model before saving
+        self.clean()
         
         # Ensure user_id is set (UUID will be generated automatically)
         self = validate_user_role(self)
         super().save(*args, **kwargs)
-    
+
+    def soft_delete(self):
+        """Soft delete a user by setting is_deleted=True and is_active=False"""
+        self.is_deleted = True
+        self.is_active = False
+        self.save(update_fields=['is_deleted', 'is_active'])
+
+    def restore(self):
+        """Restore a soft-deleted user by setting is_deleted=False and is_active=True"""
+        self.is_deleted = False
+        self.is_active = True
+        self.save(update_fields=['is_deleted', 'is_active'])
+
+    def deactivate(self):
+        """Deactivate a user without deleting them"""
+        self.is_active = False
+        self.save(update_fields=['is_active'])
+
+    def activate(self):
+        """Activate a user"""
+        self.is_active = True
+        self.is_deleted = False  # Ensure deleted flag is also cleared
+        self.save(update_fields=['is_active', 'is_deleted'])
+
     # Group-based role checking methods (for new permission system)
     def is_admin(self):
         """Check if user is in Admin group or has admin role"""

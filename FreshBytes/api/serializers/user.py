@@ -281,6 +281,16 @@ class UserSerializer(serializers.ModelSerializer):
             if not attrs.get('phone_verified', False):
                 raise serializers.ValidationError({"phone_verified": "Administrators must have a verified phone number."})
         
+        # Business rule: is_active and is_deleted cannot both be True
+        is_active = attrs.get('is_active', self.instance.is_active if self.instance else True)
+        is_deleted = attrs.get('is_deleted', self.instance.is_deleted if self.instance else False)
+        
+        if is_active and is_deleted:
+            raise serializers.ValidationError({
+                "is_active": "A user cannot be both active and deleted.",
+                "is_deleted": "A user cannot be both active and deleted."
+            })
+        
         # Validate address fields if provided
         address_fields = ['street', 'barangay', 'city', 'province']
         provided_address_fields = [field for field in address_fields if attrs.get(field)]
