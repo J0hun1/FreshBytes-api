@@ -7,6 +7,7 @@ django-filter>=23.5
 Pillow>=10.1.0
 django-extensions>=3.2.3
 drf-spectacular>=0.27.0
+python-dotenv==1.0.1
 
 # Database (for production - currently using SQLite)
 psycopg>=3.1.13
@@ -14,4 +15,8 @@ psycopg2-binary>=2.9.9
 
 # Development and Debugging
 django-extensions>=3.2.3
+
+# Deployment
+whitenoise==6.8.2
+gunicorn==20.1.0
 

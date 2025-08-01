@@ -1,4 +1,4 @@
-FROM python:3.10-slim
+FROM python:3.11-slim
 
 #prevent python from writing .pyc files and enable unbuffered output
 ENV PYTHONDONTWRITEBYTECODE=1
@@ -20,5 +20,8 @@ COPY . /code/
 #expose the port 8000 (DEFAULT DJANGO PORT)
 EXPOSE 8000
 
+# collectstatic
+RUN python manage.py collectstatic --noinput
+
 #start the Gunicorn server to serve Django app
-CMD ["gunicorn", "core.wsgi:application", "--bind", "0.0.0.0:8000"]
+CMD ["gunicorn", "FreshBytes.wsgi:application", "--bind", "0.0.0.0:8000"]

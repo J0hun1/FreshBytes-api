@@ -1,0 +1,27 @@
+# version: '3.8'
+
+services:
+  web:
+    build: .
+    command: gunicorn FreshBytes.wsgi:application --bind 0.0.0.0:8000
+    volumes:
+      - .:/code
+      - ./staticfiles:/code/staticfiles
+    ports:
+      - "8002:8000"
+    restart: always
+    depends_on:
+      - db
+
+  db:
+    image: postgres:14
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: P@ssw0rd
+      POSTGRES_DB: freshdb01
+    restart: always
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+
+volumes:
+  postgres_data:
