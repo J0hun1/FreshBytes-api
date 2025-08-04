@@ -24,4 +24,4 @@ EXPOSE 8000
 RUN python manage.py collectstatic --noinput
 
 #start the Gunicorn server to serve Django app
-CMD ["gunicorn", "FreshBytes.wsgi:application", "--bind", "0.0.0.0:8000"]
+CMD ["gunicorn", "FreshBytes.wsgi:application", "--bind", "0.0.0.0:8000 --reload"]
