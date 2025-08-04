@@ -35,3 +35,7 @@ Thumbs.db
 *.egg-info/
 
 db.sqlite3
+
+# Ignore Docker files
+docker-compose.yml
+Dockerfile
