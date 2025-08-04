@@ -1,31 +1,36 @@
-1. Bulk Test User Creation
+USERS:
+   1. Bulk Test User Creation
 
-# Create 50 test customers (default)
-python manage.py populate_test_users
+   # Create 50 test customers (default)
+   python manage.py populate_test_users
 
-# Create 100 test customers
-python manage.py populate_test_users --count 100
+   # Create 100 test customers
+   python manage.py populate_test_users --count 100
 
-# Create 25 verified customers with terms accepted
-python manage.py populate_test_users --count 25 --verified --terms-accepted
+   # Create 25 verified customers with terms accepted
+   python manage.py populate_test_users --count 25 --verified --terms-accepted
 
-# Create 10 customers with custom password
-python manage.py populate_test_users --count 10 --password mytestpass123
+   # Create 10 customers with custom password
+   python manage.py populate_test_users --count 10 --password mytestpass123
 
 
-2. Individual Test User Creation
+   2. Individual Test User Creation
 
-# Create a basic test customer
-python manage.py create_test_user
+   # Create a basic test customer
+   python manage.py create_test_user
 
-# Create a verified customer
-python manage.py create_test_user --email verified@test.com --verified --terms-accepted
+   # Create a verified customer
+   python manage.py create_test_user --email verified@test.com --verified --terms-accepted
 
-# Create a test seller
-python manage.py create_test_user --email seller@test.com --role seller --verified
+   # Create a test seller
+   python manage.py create_test_user --email seller@test.com --role seller --verified
 
-# Create a test admin
-python manage.py create_test_user --email admin@test.com --role admin --verified
+   # Create a test admin
+   python manage.py create_test_user --email admin@test.com --role admin --verified
 
-# Create a customer with custom details
-python manage.py create_test_user --email john.doe@test.com --first-name John --last-name Doe --phone 09171234567
+   # Create a customer with custom details
+   python manage.py create_test_user --email john.doe@test.com --first-name John --last-name Doe --phone 09171234567
+
+SELLERS
+
+   
