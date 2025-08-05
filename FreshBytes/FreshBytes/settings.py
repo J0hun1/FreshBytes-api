@@ -27,7 +27,7 @@ SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-default-key-for-developmen
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ["5.104.84.97"]
+ALLOWED_HOSTS = ["*"]
 APPEND_SLASH = False
 
 
@@ -128,6 +128,17 @@ WSGI_APPLICATION = "FreshBytes.wsgi.application"
 #    }
 #}
 
+
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.postgresql',
+#         'NAME': "freshdb01",
+#         'USER': "postgres",
+#         'PASSWORD': "admin",
+#         'HOST': "localhost",
+#         'PORT': "5432"
+#     }
+# }
 
 DATABASES = {
     'default': {
