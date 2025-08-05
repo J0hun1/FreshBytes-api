@@ -36,29 +36,6 @@ Thumbs.db
 
 db.sqlite3
 
-# Docker
-docker-compose.override.yml
-.docker/
-docker-data/
-*.env.local
-*.env.production
-
-# Media files (user uploads)
-media/
-
-# Static files (collected)
-staticfiles/
-
-# IDE
-.idea/
-*.swp
-*.swo
-
-# Logs
-logs/
-*.log
-
-# Temporary files
-*.tmp
-*.temp
-
+# Ignore Docker files
+docker-compose.yml
+Dockerfile
