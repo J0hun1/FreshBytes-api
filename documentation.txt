@@ -83,4 +83,3 @@ TODOS:
         Add validation logic in DRF serializers for all new models.
     Views:
         Use service functions in your API views to encapsulate business logic (not in the view directly).
-
