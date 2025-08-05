@@ -35,8 +35,16 @@ check_docker() {
 # Check if docker-compose is available
 check_docker_compose() {
     if ! command -v docker-compose &> /dev/null; then
-        print_error "docker-compose is not installed or not in PATH."
-        exit 1
+        # Try docker compose (newer version)
+        if ! docker compose version &> /dev/null; then
+            print_error "Neither docker-compose nor docker compose is available."
+            exit 1
+        else
+            # Use docker compose instead
+            DOCKER_COMPOSE_CMD="docker compose"
+        fi
+    else
+        DOCKER_COMPOSE_CMD="docker-compose"
     fi
 }
 
@@ -45,17 +53,33 @@ update_docker() {
     print_status "Updating Docker containers..."
     
     # Stop existing containers
-    docker-compose down
+    $DOCKER_COMPOSE_CMD down
     
     # Rebuild containers with latest code
-    docker-compose build --no-cache web
+    print_status "Building Docker image..."
+    if ! $DOCKER_COMPOSE_CMD build --no-cache web; then
+        print_error "Docker build failed. Trying with cache..."
+        if ! $DOCKER_COMPOSE_CMD build web; then
+            print_error "Docker build failed completely. Check the error messages above."
+            exit 1
+        fi
+    fi
     
     # Start containers
-    docker-compose up -d
+    print_status "Starting containers..."
+    $DOCKER_COMPOSE_CMD up -d
     
     # Wait for containers to be ready
     print_status "Waiting for containers to be ready..."
     sleep 10
+    
+    # Check if containers are running
+    if ! $DOCKER_COMPOSE_CMD ps | grep -q "Up"; then
+        print_error "Containers failed to start properly."
+        print_status "Checking logs..."
+        $DOCKER_COMPOSE_CMD logs web
+        exit 1
+    fi
     
     print_success "Docker containers updated successfully!"
 }
@@ -65,10 +89,10 @@ run_migrations() {
     print_status "Running database migrations..."
     
     # Make migrations
-    docker-compose exec -T web python manage.py makemigrations
+    $DOCKER_COMPOSE_CMD exec -T web python manage.py makemigrations
     
     # Apply migrations
-    docker-compose exec -T web python manage.py migrate
+    $DOCKER_COMPOSE_CMD exec -T web python manage.py migrate
     
     print_success "Database migrations completed!"
 }
@@ -77,7 +101,7 @@ run_migrations() {
 collect_static() {
     print_status "Collecting static files..."
     
-    docker-compose exec -T web python manage.py collectstatic --noinput
+    $DOCKER_COMPOSE_CMD exec -T web python manage.py collectstatic --noinput
     
     print_success "Static files collected!"
 }
@@ -87,9 +111,9 @@ create_superuser() {
     print_status "Checking if superuser exists..."
     
     # Check if superuser exists
-    if ! docker-compose exec -T web python manage.py shell -c "from django.contrib.auth import get_user_model; User = get_user_model(); print('Superuser exists' if User.objects.filter(is_superuser=True).exists() else 'No superuser')" 2>/dev/null | grep -q "Superuser exists"; then
+    if ! $DOCKER_COMPOSE_CMD exec -T web python manage.py shell -c "from django.contrib.auth import get_user_model; User = get_user_model(); print('Superuser exists' if User.objects.filter(is_superuser=True).exists() else 'No superuser')" 2>/dev/null | grep -q "Superuser exists"; then
         print_warning "No superuser found. You can create one with:"
-        echo "docker-compose exec web python manage.py createsuperuser"
+        echo "$DOCKER_COMPOSE_CMD exec web python manage.py createsuperuser"
     else
         print_success "Superuser already exists!"
     fi
@@ -98,7 +122,7 @@ create_superuser() {
 # Function to show container status
 show_status() {
     print_status "Container status:"
-    docker-compose ps
+    $DOCKER_COMPOSE_CMD ps
     
     echo ""
     print_status "Application URLs:"
@@ -148,17 +172,17 @@ case "${1:-}" in
         update_docker
         ;;
     "status")
-        docker-compose ps
+        $DOCKER_COMPOSE_CMD ps
         ;;
     "logs")
-        docker-compose logs -f web
+        $DOCKER_COMPOSE_CMD logs -f web
         ;;
     "stop")
-        docker-compose down
+        $DOCKER_COMPOSE_CMD down
         print_success "Containers stopped!"
         ;;
     "restart")
-        docker-compose restart web
+        $DOCKER_COMPOSE_CMD restart web
         print_success "Web container restarted!"
         ;;
     *)

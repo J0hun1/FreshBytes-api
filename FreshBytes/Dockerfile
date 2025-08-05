@@ -20,8 +20,5 @@ COPY . /code/
 #expose the port 8000 (DEFAULT DJANGO PORT)
 EXPOSE 8000
 
-# collectstatic
-RUN python manage.py collectstatic --noinput
-
 #start the Gunicorn server to serve Django app
-CMD ["gunicorn", "FreshBytes.wsgi:application", "--bind", "0.0.0.0:8000 --reload"]
+CMD ["gunicorn", "FreshBytes.wsgi:application", "--bind", "0.0.0.0:8000", "--reload"]
