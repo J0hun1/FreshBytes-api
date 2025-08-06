@@ -8,7 +8,7 @@ from ..serializers import OrderSerializer, OrderItemSerializer, PaymentSerialize
 from ..services.order_services import create_order_from_cart
 from ..services.seller_services import update_seller_stats_on_order_delivered
 from drf_spectacular.utils import extend_schema, extend_schema_view
-from ..permissions import IsSellerGroup, IsAdminGroup
+from ..permissions import IsSellerGroup, IsAdminGroup, IsVerifiedUser
 
 @extend_schema(tags=['Order'])
 
@@ -24,7 +24,7 @@ class OrderViewSet(viewsets.ModelViewSet):
             return get_object_or_404(Order, order_number=order_number)
         return super().get_object()
 
-    @action(detail=False, methods=['post'])
+    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated, IsVerifiedUser])
     def checkout(self, request):
         cart_item_ids = request.data.get('cart_item_ids', None)
         payment_method = request.data.get('payment_method', None)

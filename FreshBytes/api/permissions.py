@@ -19,24 +19,47 @@ class HasGroupPermission(BasePermission):
                   for group in self.required_groups)
 
 class IsAdminGroup(HasGroupPermission):
-    """Permission that allows access only to users in Admin group"""
+    """Permission for admin users only."""
     required_groups = ['Admin']
 
 class IsSellerGroup(HasGroupPermission):
-    """Permission that allows access only to users in Seller group"""
+    """Permission for seller users only."""
     required_groups = ['Seller']
 
 class IsCustomerGroup(HasGroupPermission):
-    """Permission that allows access only to users in Customer group"""
+    """Permission for customer users only."""
     required_groups = ['Customer']
 
-class IsSellerOrAdminGroup(HasGroupPermission):
-    """Permission that allows access to users in Seller OR Admin groups"""
-    required_groups = ['Seller', 'Admin']
+class IsVerifiedUser(BasePermission):
+    """
+    Permission that requires users to have either phone or email verified.
+    Users can login and view products but cannot perform transactions,
+    add reviews, or add to cart without verification.
+    """
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+        
+        # Check if user has either phone or email verified
+        if not request.user.phone_verified and not request.user.email_verified:
+            return False
+        
+        return True
 
-class IsCustomerOrSellerGroup(HasGroupPermission):
-    """Permission that allows access to users in Customer OR Seller groups"""
-    required_groups = ['Customer', 'Seller']
+class IsFullyVerifiedUser(BasePermission):
+    """
+    Permission that requires users to have both phone and email verified.
+    For sensitive operations that require full verification.
+    """
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+        
+        # Check if user has both phone and email verified
+        if not request.user.phone_verified or not request.user.email_verified:
+            return False
+        
+        return True
 
 # Object-level permissions
 class IsOwnerOrAdmin(BasePermission):

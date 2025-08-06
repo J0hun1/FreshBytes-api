@@ -32,6 +32,8 @@ urlpatterns = [
     
     # Permission and role checking endpoints
     path("auth/permissions/", views.UserPermissionsView.as_view(), name="user_permissions"),  
+    # User verification status endpoint
+    path("auth/verification-status/", views.UserVerificationStatusView.as_view(), name="user_verification_status"),  
 
     # Admin dashboard
     path("admin/dashboard/", views.AdminDashboardView.as_view(), name="admin-dashboard"),

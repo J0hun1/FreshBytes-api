@@ -296,3 +296,29 @@ class UserPermissionsView(APIView):
             'user_id': str(request.user.user_id),
             'checked_at': timezone.now().isoformat()
         })
+
+@extend_schema(tags=['UserVerification'])
+class UserVerificationStatusView(APIView):
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        """Get user's verification status and helpful messages"""
+        from ..utils.verification import get_verification_status, get_verification_message
+        
+        user = request.user
+        verification_status = get_verification_status(user)
+        verification_message = get_verification_message(user)
+        
+        return Response({
+            'user_id': str(user.user_id),
+            'email': user.user_email,
+            'verification_status': verification_status,
+            'message': verification_message,
+            'can_perform_actions': {
+                'can_add_to_cart': verification_status['partially_verified'],
+                'can_make_reviews': verification_status['partially_verified'],
+                'can_make_transactions': verification_status['partially_verified'],
+                'can_view_products': True,  # Always allowed
+                'can_login': True,  # Always allowed
+            }
+        })

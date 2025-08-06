@@ -1,7 +1,7 @@
 from .product import ProductViewSet
 from .user import (
     CustomTokenObtainPairView, RegisterView, LogoutView, UserViewSet,
-    UserPermissionsView, AdminDashboardView, StoreDashboardView
+    UserPermissionsView, AdminDashboardView, StoreDashboardView, UserVerificationStatusView
 )
 from .order import  OrderViewSet, OrderItemViewSet
 from .seller import SellerViewSet

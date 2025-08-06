@@ -2,17 +2,12 @@ from django.shortcuts import get_object_or_404
 from django.db import transaction
 from django.core.exceptions import ValidationError
 from ..models import Cart, CartItem, Product
+from ..utils.verification import check_user_verification
 
 def validate_user_for_cart(user):
     """Validate that user can use cart functionality"""
-    # Check if user is active
-    if not user.is_active:
-        raise ValueError("Your account is inactive. Please contact support.")
-    
-    # Check if user is not deleted
-    if user.is_deleted:
-        raise ValueError("Your account has been deleted. Please contact support.")
-    
+    # Use the verification utility function
+    check_user_verification(user, require_both=False)
     return True
 
 def get_or_create_cart(user):
