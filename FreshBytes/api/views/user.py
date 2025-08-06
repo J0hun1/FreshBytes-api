@@ -12,11 +12,69 @@ from ..serializers import UserSerializer, UserListSerializer, CustomTokenObtainP
 from ..permissions import IsAdminGroup, IsSellerGroup, IsCustomerGroup
 from drf_spectacular.utils import extend_schema, extend_schema_view
 from rest_framework import serializers
+import logging
+from ..utils.logging_utils import log_security_event, log_business_event, log_user_activity
 
+# Get logger for this module
+logger = logging.getLogger(__name__)
 
 class CustomTokenObtainPairView(TokenObtainPairView):
     permission_classes = [AllowAny]
     serializer_class = CustomTokenObtainPairSerializer
+
+    def post(self, request, *args, **kwargs):
+        """Enhanced login with security logging"""
+        try:
+            # Log login attempt
+            user_email = request.data.get('user_email', 'unknown')
+            ip_address = self.get_client_ip(request)
+            
+            logger.info(f"Login attempt for user: {user_email} from IP: {ip_address}")
+            
+            # Attempt login
+            response = super().post(request, *args, **kwargs)
+            
+            if response.status_code == 200:
+                # Successful login
+                user_id = response.data.get('user_id', 'unknown')
+                log_security_event(
+                    event_type="LOGIN_SUCCESS",
+                    user_id=user_id,
+                    details={
+                        "user_email": user_email,
+                        "ip_address": ip_address,
+                        "user_agent": request.META.get('HTTP_USER_AGENT', 'unknown')
+                    }
+                )
+                logger.info(f"Successful login for user: {user_email} (ID: {user_id})")
+            else:
+                # Failed login
+                log_security_event(
+                    event_type="LOGIN_FAILED",
+                    user_id=None,
+                    details={
+                        "user_email": user_email,
+                        "ip_address": ip_address,
+                        "user_agent": request.META.get('HTTP_USER_AGENT', 'unknown'),
+                        "error": response.data.get('detail', 'unknown error')
+                    }
+                )
+                logger.warning(f"Failed login attempt for user: {user_email} from IP: {ip_address}")
+            
+            return response
+            
+        except Exception as e:
+            logger.error(f"Login error: {str(e)}")
+            raise
+
+    def get_client_ip(self, request):
+        """Extract client IP address"""
+        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+        if x_forwarded_for:
+            ip = x_forwarded_for.split(',')[0]
+        else:
+            ip = request.META.get('REMOTE_ADDR')
+        return ip
 
 @extend_schema(tags=['AdminDashboard'])
 class AdminDashboardView(APIView):
@@ -51,14 +109,47 @@ class LogoutRequestSerializer(serializers.Serializer):
 )
 class LogoutView(APIView):
     permission_classes = [IsAuthenticated]
+    
     def post(self, request):
+        """Enhanced logout with session tracking"""
         try:
             refresh_token = request.data["refresh_token"]
+            user_id = str(request.user.user_id)
+            username = request.user.user_name
+            ip_address = self.get_client_ip(request)
+            
+            # Log logout attempt
+            logger.info(f"Logout attempt for user: {username} (ID: {user_id}) from IP: {ip_address}")
+            
             token = RefreshToken(refresh_token)
             token.blacklist()
+            
+            # Log successful logout
+            log_security_event(
+                event_type="LOGOUT_SUCCESS",
+                user_id=user_id,
+                details={
+                    "username": username,
+                    "ip_address": ip_address,
+                    "user_agent": request.META.get('HTTP_USER_AGENT', 'unknown')
+                }
+            )
+            logger.info(f"Successful logout for user: {username} (ID: {user_id})")
+            
             return Response({"message": "Successfully logged out."}, status=status.HTTP_200_OK)
-        except Exception:
+            
+        except Exception as e:
+            logger.error(f"Logout error for user {request.user.user_name}: {str(e)}")
             return Response({"error": "Invalid token."}, status=status.HTTP_400_BAD_REQUEST)
+
+    def get_client_ip(self, request):
+        """Extract client IP address"""
+        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+        if x_forwarded_for:
+            ip = x_forwarded_for.split(',')[0]
+        else:
+            ip = request.META.get('REMOTE_ADDR')
+        return ip
 
 
 @extend_schema(tags=['User'])
@@ -92,21 +183,73 @@ class UserViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'])
     def enable(self, request, pk=None):
-        user = get_object_or_404(User, pk=pk, is_deleted=False)
-        if user.is_active:
-            return Response({"detail": "User already active."}, status=400)
-        user.is_active = True
-        user.save(update_fields=["is_active"])
-        return Response(UserSerializer(user).data, status=200)
+        """Enhanced user enable with audit logging"""
+        try:
+            user = get_object_or_404(User, pk=pk, is_deleted=False)
+            admin_user = request.user
+            
+            if user.is_active:
+                logger.warning(f"Admin {admin_user.user_name} attempted to enable already active user: {user.user_name}")
+                return Response({"detail": "User already active."}, status=400)
+            
+            # Log the enable action
+            log_business_event(
+                event_type="USER_ENABLED",
+                user_id=str(user.user_id),
+                admin_user_id=str(admin_user.user_id),
+                details={
+                    "target_user": user.user_name,
+                    "admin_user": admin_user.user_name,
+                    "previous_status": "inactive",
+                    "new_status": "active"
+                }
+            )
+            
+            user.is_active = True
+            user.save(update_fields=["is_active"])
+            
+            logger.info(f"User {user.user_name} (ID: {user.user_id}) enabled by admin {admin_user.user_name}")
+            
+            return Response(UserSerializer(user).data, status=200)
+            
+        except Exception as e:
+            logger.error(f"Error enabling user {pk}: {str(e)}")
+            raise
 
     @action(detail=True, methods=['post'])
     def disable(self, request, pk=None):
-        user = get_object_or_404(User, pk=pk, is_deleted=False)
-        if not user.is_active:
-            return Response({"detail": "User already inactive."}, status=400)
-        user.is_active = False
-        user.save(update_fields=["is_active"])
-        return Response({"detail": "User disabled."}, status=200)
+        """Enhanced user disable with audit logging"""
+        try:
+            user = get_object_or_404(User, pk=pk, is_deleted=False)
+            admin_user = request.user
+            
+            if not user.is_active:
+                logger.warning(f"Admin {admin_user.user_name} attempted to disable already inactive user: {user.user_name}")
+                return Response({"detail": "User already inactive."}, status=400)
+            
+            # Log the disable action
+            log_business_event(
+                event_type="USER_DISABLED",
+                user_id=str(user.user_id),
+                admin_user_id=str(admin_user.user_id),
+                details={
+                    "target_user": user.user_name,
+                    "admin_user": admin_user.user_name,
+                    "previous_status": "active",
+                    "new_status": "inactive"
+                }
+            )
+            
+            user.is_active = False
+            user.save(update_fields=["is_active"])
+            
+            logger.info(f"User {user.user_name} (ID: {user.user_id}) disabled by admin {admin_user.user_name}")
+            
+            return Response({"detail": "User disabled."}, status=200)
+            
+        except Exception as e:
+            logger.error(f"Error disabling user {pk}: {str(e)}")
+            raise
 
     @action(detail=True, methods=['post'])
     def restore(self, request, pk=None):

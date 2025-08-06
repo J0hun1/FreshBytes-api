@@ -106,27 +106,29 @@ def log_database_operation(operation_name=None):
         return wrapper
     return decorator
 
-def log_security_event(event_type, details, user=None, ip_address=None):
+def log_security_event(event_type, user_id=None, details=None, ip_address=None, user_agent=None):
     """
     Log security-related events.
     
     Args:
-        event_type (str): Type of security event (login, logout, permission_denied, etc.)
-        details (str): Details about the event
-        user: User object or user identifier
+        event_type (str): Type of security event (LOGIN_SUCCESS, LOGIN_FAILED, LOGOUT_SUCCESS, etc.)
+        user_id (str): User ID
+        details (dict): Details about the event
         ip_address (str): IP address of the request
+        user_agent (str): User agent string
     """
     security_logger = logging.getLogger('django.security')
     
     log_data = {
         'event_type': event_type,
-        'details': details,
+        'user_id': user_id or 'anonymous',
         'timestamp': timezone.now().isoformat(),
-        'user': str(user) if user else 'anonymous',
-        'ip_address': ip_address or 'unknown'
+        'ip_address': ip_address or 'unknown',
+        'user_agent': user_agent or 'unknown',
+        'details': details or {}
     }
     
-    security_logger.warning(f"Security Event: {event_type} - {details} - User: {log_data['user']} - IP: {log_data['ip_address']}")
+    security_logger.warning(f"Security Event: {event_type} - User: {log_data['user_id']} - IP: {log_data['ip_address']} - Details: {log_data['details']}")
 
 def log_performance_metric(metric_name, value, unit=None, tags=None):
     """
@@ -143,51 +145,50 @@ def log_performance_metric(metric_name, value, unit=None, tags=None):
     
     logger.info(f"Performance Metric: {metric_name} = {value}{unit_str}{tags_str}")
 
-def log_business_event(event_type, details, user=None, data=None):
+def log_business_event(event_type, user_id=None, admin_user_id=None, details=None):
     """
     Log business events for analytics and monitoring.
     
     Args:
-        event_type (str): Type of business event (order_created, user_registered, etc.)
-        details (str): Details about the event
-        user: User object or user identifier
-        data (dict): Additional event data
+        event_type (str): Type of business event (USER_ENABLED, USER_DISABLED, CHECKOUT_SUCCESS, etc.)
+        user_id (str): User ID (target user for the event)
+        admin_user_id (str): Admin user ID (if admin performed the action)
+        details (dict): Additional event data
     """
     business_logger = logging.getLogger('api.business')
     
     log_data = {
         'event_type': event_type,
-        'details': details,
+        'user_id': user_id or 'anonymous',
+        'admin_user_id': admin_user_id,
         'timestamp': timezone.now().isoformat(),
-        'user': str(user) if user else 'anonymous',
-        'data': data or {}
+        'details': details or {}
     }
     
-    business_logger.info(f"Business Event: {event_type} - {details} - User: {log_data['user']} - Data: {log_data['data']}")
+    admin_info = f" - Admin: {admin_user_id}" if admin_user_id else ""
+    business_logger.info(f"Business Event: {event_type} - User: {log_data['user_id']}{admin_info} - Details: {log_data['details']}")
 
 # Convenience functions for common logging patterns
-def log_user_activity(activity, user, details=None):
+def log_user_activity(activity, user_id, details=None):
     """Log user activities for audit purposes."""
     log_business_event(
         event_type="user_activity",
-        details=f"{activity} - {details or ''}",
-        user=user
+        user_id=user_id,
+        details={"activity": activity, "details": details or ""}
     )
 
-def log_order_event(event_type, order_id, user, details=None):
+def log_order_event(event_type, order_id, user_id, details=None):
     """Log order-related events."""
     log_business_event(
         event_type=f"order_{event_type}",
-        details=f"Order {order_id} - {details or ''}",
-        user=user,
-        data={'order_id': order_id}
+        user_id=user_id,
+        details={"order_id": order_id, "details": details or ""}
     )
 
-def log_product_event(event_type, product_id, user, details=None):
+def log_product_event(event_type, product_id, user_id, details=None):
     """Log product-related events."""
     log_business_event(
         event_type=f"product_{event_type}",
-        details=f"Product {product_id} - {details or ''}",
-        user=user,
-        data={'product_id': product_id}
+        user_id=user_id,
+        details={"product_id": product_id, "details": details or ""}
     ) 

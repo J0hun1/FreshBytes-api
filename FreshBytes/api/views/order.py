@@ -9,6 +9,11 @@ from ..services.order_services import create_order_from_cart
 from ..services.seller_services import update_seller_stats_on_order_delivered
 from drf_spectacular.utils import extend_schema, extend_schema_view
 from ..permissions import IsSellerGroup, IsAdminGroup, IsVerifiedUser
+import logging
+from ..utils.logging_utils import log_business_event, log_user_activity
+
+# Get logger for this module
+logger = logging.getLogger(__name__)
 
 @extend_schema(tags=['Order'])
 
@@ -26,15 +31,63 @@ class OrderViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated, IsVerifiedUser])
     def checkout(self, request):
-        cart_item_ids = request.data.get('cart_item_ids', None)
-        payment_method = request.data.get('payment_method', None)
+        """Enhanced checkout with business transaction logging"""
         try:
+            user = request.user
+            cart_item_ids = request.data.get('cart_item_ids', None)
+            payment_method = request.data.get('payment_method', None)
+            
+            # Log checkout attempt
+            logger.info(f"Checkout attempt for user: {user.user_name} (ID: {user.user_id}) with {len(cart_item_ids) if cart_item_ids else 0} items")
+            
+            # Log business event
+            log_business_event(
+                event_type="CHECKOUT_ATTEMPTED",
+                user_id=str(user.user_id),
+                details={
+                    "cart_item_ids": cart_item_ids,
+                    "payment_method": payment_method,
+                    "user_name": user.user_name
+                }
+            )
+            
             order, payment = create_order_from_cart(request.user, cart_item_ids, payment_method)
+            
+            # Log successful checkout
+            log_business_event(
+                event_type="CHECKOUT_SUCCESS",
+                user_id=str(user.user_id),
+                details={
+                    "order_id": str(order.order_id),
+                    "payment_id": str(payment.payment_id) if payment else None,
+                    "order_total": str(order.order_total),
+                    "payment_method": payment_method,
+                    "user_name": user.user_name
+                }
+            )
+            
+            logger.info(f"Successful checkout for user: {user.user_name} - Order: {order.order_id}, Payment: {payment.payment_id if payment else 'N/A'}")
+            
             return Response({
                 "order": OrderSerializer(order).data,
                 "payment": PaymentSerializer(payment).data
             }, status=status.HTTP_201_CREATED)
+            
         except Exception as e:
+            # Log checkout failure
+            logger.error(f"Checkout failed for user {request.user.user_name}: {str(e)}")
+            
+            log_business_event(
+                event_type="CHECKOUT_FAILED",
+                user_id=str(request.user.user_id),
+                details={
+                    "error": str(e),
+                    "cart_item_ids": request.data.get('cart_item_ids'),
+                    "payment_method": request.data.get('payment_method'),
+                    "user_name": request.user.user_name
+                }
+            )
+            
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
     ALLOWED_TRANSITIONS = {
