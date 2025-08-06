@@ -16,6 +16,9 @@ psycopg2-binary>=2.9.9
 # Development and Debugging
 django-extensions>=3.2.3
 
+# Monitoring and System
+psutil>=5.9.0
+
 # Deployment
 whitenoise==6.8.2
 gunicorn==20.1.0

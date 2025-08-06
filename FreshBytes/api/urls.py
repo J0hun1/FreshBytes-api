@@ -1,5 +1,6 @@
 from django.urls import path
 from . import views
+from .views import health
 from rest_framework_simplejwt.views import TokenRefreshView
 from rest_framework.routers import DefaultRouter
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView, SpectacularRedocView
@@ -18,9 +19,12 @@ router.register(r'subcategories', views.SubCategoryViewSet, basename='subcategor
 router.register(r'payments', views.PaymentViewSet, basename='payment')
 
 urlpatterns = [
-    # ========================================
-    # AUTHENTICATION & AUTHORIZATION ENDPOINTS
-    # ========================================
+    
+    # Comprehensive health check for monitoring
+    path("health/", health.health_check, name="health_check"),
+    # Simple health check for load balancers
+    path("health/simple/", health.simple_health_check, name="simple_health_check"),
+    
     # JWT token-based authentication
     path("auth/login/", views.CustomTokenObtainPairView.as_view(), name="token_obtain_pair"),  
     # Refresh expired JWT token
