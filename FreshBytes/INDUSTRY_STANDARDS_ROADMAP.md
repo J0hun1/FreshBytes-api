@@ -17,19 +17,20 @@
 
 ### ❌ **Critical Gaps (Priority 1)**
 - No logging/monitoring ✅ `(finished: 08/06/2025)`
-    *added logs in these 5 views for now:   
+    * added logs in these 5 views for now:   
         CustomTokenObtainPairView - Login security
         LogoutView - Session security
         UserViewSet.enable() - User management audit
         UserViewSet.disable() - User management audit
         Payment/Order processing - Business transaction audit
 
+- No health checks ✅ `(finished: 08/06/2025)`
+    * Can be accessed through http://localhost:8000/api/health/
 
 - No rate limiting
 - No caching
 - No Docker containerization
 - No CI/CD pipeline
-- No health checks
 - No security headers
 - Limited test coverage
 

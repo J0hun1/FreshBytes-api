@@ -193,6 +193,21 @@ REST_FRAMEWORK = {
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 20,
     'EXCEPTION_HANDLER': 'api.utils.exceptions.custom_exception_handler',
+
+    # Rate limiting
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle',
+        'rest_framework.throttling.ScopedRateThrottle',
+        'api.utils.throttling.BurstRateThrottle',
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': os.getenv('THROTTLE_ANON', '100/hour'),
+        'user': os.getenv('THROTTLE_USER', '1000/hour'),
+        'burst': os.getenv('THROTTLE_BURST', '60/minute'),
+        'login': os.getenv('THROTTLE_LOGIN', '5/minute'),
+        'register': os.getenv('THROTTLE_REGISTER', '3/minute'),
+    },
 }
 
 from datetime import timedelta

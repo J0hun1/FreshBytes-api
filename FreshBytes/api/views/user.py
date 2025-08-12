@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 class CustomTokenObtainPairView(TokenObtainPairView):
     permission_classes = [AllowAny]
     serializer_class = CustomTokenObtainPairSerializer
+    throttle_scope = 'login'
 
     def post(self, request, *args, **kwargs):
         """Enhanced login with security logging"""
@@ -99,6 +100,7 @@ class RegisterView(generics.CreateAPIView):
     permission_classes = [AllowAny]
     queryset = User.objects.all()
     serializer_class = UserSerializer
+    throttle_scope = 'register'
 
 class LogoutRequestSerializer(serializers.Serializer):
     refresh_token = serializers.CharField()
